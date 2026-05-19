@@ -371,7 +371,7 @@ const paymentMethod = ref('cash')
 const selectedPickupDate = ref(null)
 const selectedPickupSlot = ref(null)
 
-const orderPlaced = ref(false) // ключевой флаг
+const orderPlaced = ref(false)
 
 const offices = ref([
   { id: 1, address: 'Дворянская 27АК17', deliveryTime: '16:00' },
@@ -385,7 +385,6 @@ const pickupDates = computed(() => {
   const dates = []
   let current = new Date()
   const now = new Date()
-  // Если текущее время > 16:00, начинаем с завтрашнего дня
   if (now.getHours() >= 16) {
     current.setDate(current.getDate() + 1)
   }
@@ -439,7 +438,6 @@ const confirmDelivery = () => {
   showDeliveryModal.value = false
 }
 
-// Проверка заполненности
 const canProceed = computed(() => {
   if (deliveryMethod.value === 'delivery') {
     return selectedOffice.value && selectedCabinet.value.trim() !== '' && paymentMethod.value
@@ -451,7 +449,6 @@ const canProceed = computed(() => {
 
 const showQrModal = ref(false)
 
-// *** ИСПРАВЛЕННАЯ ФУНКЦИЯ ***
 const submitOrder = async () => {
   try {
     const mergedItems = combinedItems.value.reduce((acc, item) => {
@@ -523,7 +520,7 @@ const completePayment = async () => {
   }
 }
 
-// ====== Логика общей корзины ======
+// ====== Логика общей корзины (ИСПРАВЛЕНО) ======
 const combinedItems = computed(() => {
   const personal = cartItems.value.map((item) => ({
     ...item,
@@ -542,10 +539,14 @@ const combinedItems = computed(() => {
     isShared: true,
     added_by_user_name: item.added_by_user_name,
     shared_item_id: item.id,
-    discount_price: null, // общая корзина пока без скидок
+    discount_price: null,
   }))
 
-  return [...personal, ...shared].sort((a, b) => a.product_name.localeCompare(b.product_name, 'ru'))
+  const merged = [...personal, ...shared].sort((a, b) =>
+    a.product_name.localeCompare(b.product_name, 'ru'),
+  )
+  console.log('combinedItems пересчитан, элементов:', merged.length)
+  return merged
 })
 
 const totalSumCombined = computed(() => {
@@ -560,6 +561,7 @@ const totalWeightCombined = computed(() => totalWeight.value)
 
 const currentUserId = ref(null)
 
+// Исправленная загрузка общей корзины
 const loadSharedCart = async () => {
   if (!sharedToken.value) {
     sharedCart.value = null
@@ -570,14 +572,19 @@ const loadSharedCart = async () => {
       `http://127.0.0.1:8000/api/v1/shared-cart/${sharedToken.value}`,
     )
     const data = response.data
+    console.log('Общая корзина загружена:', data)
+
     if (currentUserId.value && data.owner_id !== currentUserId.value) {
+      console.warn('Токен чужой корзины, сбрасываем')
       localStorage.removeItem('shared_cart_token')
       sharedToken.value = ''
       sharedCart.value = null
       return
     }
-    sharedCart.value = data
-  } catch {
+    // Принудительно создаём новый объект для реактивности
+    sharedCart.value = { ...data, items: data.items ? [...data.items] : [] }
+  } catch (err) {
+    console.error('Ошибка загрузки общей корзины:', err)
     localStorage.removeItem('shared_cart_token')
     sharedToken.value = ''
     sharedCart.value = null
