@@ -1,14 +1,16 @@
 <template>
-  <div class="min-h-screen bg-gray-100 p-8">
-    <transition name="fade" appear>
-      <div v-if="product" class="max-w-6xl mx-auto">
-        <img
-          src="/Logo.svg"
-          alt="Логотип"
-          class="absolute top-0 left-4 h-12 w-auto mt-4 cursor-pointer"
-          @click="$router.push('/')"
-        />
-        <!-- Кнопка назад -->
+  <div class="min-h-screen bg-gray-100 p-8 relative">
+    <!-- Логотип -->
+    <img
+      src="/Logo.svg"
+      alt="Логотип"
+      class="absolute top-0 left-4 h-12 w-auto mt-4 cursor-pointer"
+      @click="$router.push('/')"
+    />
+
+    <div v-if="product" class="max-w-6xl mx-auto">
+      <!-- Кнопка назад -->
+      <transition name="fade" appear>
         <div class="mb-4">
           <img
             src="/ArrowLeft.svg"
@@ -17,12 +19,14 @@
             @click="$router.back()"
           />
         </div>
+      </transition>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <!-- Левая часть: фото и кнопки -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Левая часть: фото и кнопки -->
+        <transition name="slide-up" appear>
           <div class="flex flex-col items-center">
             <img
-              :src="product.image_url"
+              :src="productImage"
               :alt="product.name"
               class="w-full max-w-md h-80 object-contain mb-6"
             />
@@ -59,50 +63,56 @@
               Товара больше добавить нельзя
             </p>
           </div>
+        </transition>
 
-          <!-- Правая часть: информация -->
-          <div>
-            <h1 class="text-3xl font-bold text-gray-800 mb-4">{{ product.name }}</h1>
-            <p class="text-gray-600 mb-4" v-if="product.description">{{ product.description }}</p>
+        <!-- Правая часть: информация -->
+        <transition name="slide-up" appear>
+          <div class="flex flex-col justify-center">
+            <h1 class="text-5xl font-extrabold text-gray-800 mb-6">{{ product.name }}</h1>
+            <p class="text-gray-600 text-lg mb-6" v-if="product.description">
+              {{ product.description }}
+            </p>
 
-            <div class="space-y-2 mb-6">
-              <div class="flex gap-4">
-                <span class="font-semibold">Цена:</span>
-                <span>{{ product.price }} руб.</span>
+            <div class="space-y-4 mb-8">
+              <div class="flex gap-4 items-baseline">
+                <span class="font-semibold text-xl w-24">Цена:</span>
+                <span class="text-xl">{{ product.price }} руб.</span>
               </div>
-              <div class="flex gap-4">
-                <span class="font-semibold">Вес:</span>
-                <span>{{ product.weight }} гр.</span>
+              <div class="flex gap-4 items-baseline">
+                <span class="font-semibold text-xl w-24">Вес:</span>
+                <span class="text-xl">{{ product.weight }} гр.</span>
               </div>
-              <div class="flex gap-4" v-if="product.expiration_date">
-                <span class="font-semibold">Срок годности:</span>
-                <span>{{ new Date(product.expiration_date).toLocaleDateString('ru-RU') }}</span>
+              <div class="flex gap-4 items-baseline" v-if="product.expiration_date">
+                <span class="font-semibold text-xl w-24">Срок годности:</span>
+                <span class="text-xl">{{
+                  new Date(product.expiration_date).toLocaleDateString('ru-RU')
+                }}</span>
               </div>
-              <div class="flex gap-4" v-if="product.cooking_info">
-                <span class="font-semibold">Приготовление:</span>
-                <span>{{ product.cooking_info }}</span>
+              <div class="flex flex-col gap-1" v-if="product.cooking_info">
+                <span class="font-semibold text-xl">Приготовление:</span>
+                <span class="text-xl break-words">{{ product.cooking_info }}</span>
               </div>
             </div>
 
-            <!-- Оценки (реальные) -->
-            <div class="grid grid-cols-2 gap-6 mb-8">
+            <!-- Оценки -->
+            <div class="grid grid-cols-2 gap-8 mb-8">
               <div>
-                <p class="text-sm text-gray-500 mb-1">Общая оценка</p>
-                <div class="flex items-center gap-1">
+                <p class="text-base text-gray-500 mb-2">Общая оценка</p>
+                <div class="flex items-center gap-2">
                   <img
                     v-for="i in 5"
                     :key="'avg' + i"
                     :src="i <= averageRating ? '/Star_on.svg' : '/Star_off.svg'"
                     class="w-8 h-8"
                   />
-                  <span class="ml-2 text-sm text-gray-600">{{
+                  <span class="ml-2 text-xl font-semibold text-gray-700">{{
                     averageRating ? averageRating + '/5' : 'нет оценок'
                   }}</span>
                 </div>
               </div>
               <div>
-                <p class="text-sm text-gray-500 mb-1">Ваша оценка</p>
-                <div class="flex items-center gap-1">
+                <p class="text-base text-gray-500 mb-2">Ваша оценка</p>
+                <div class="flex items-center gap-2">
                   <img
                     v-for="i in 5"
                     :key="'user' + i"
@@ -110,32 +120,34 @@
                     class="w-8 h-8 cursor-pointer transition hover:scale-110"
                     @click="rateProduct(i)"
                   />
-                  <span class="ml-2 text-sm text-gray-600">{{
+                  <span class="ml-2 text-xl font-semibold text-gray-700">{{
                     userRating ? userRating + '/5' : 'не оценено'
                   }}</span>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </transition>
+      </div>
 
-        <!-- Похожие товары -->
+      <!-- Похожие товары -->
+      <transition name="slide-up" appear>
         <div v-if="relatedProducts.length" class="mt-12">
-          <h3 class="text-xl font-semibold mb-4">Похожие товары</h3>
-          <div class="grid grid-cols-2 gap-4">
+          <h3 class="text-2xl font-semibold mb-6">Похожие товары</h3>
+          <div class="grid grid-cols-2 gap-6">
             <div
               v-for="rel in relatedProducts"
               :key="rel.product_id"
-              class="flex items-center gap-4 border rounded-lg p-3 cursor-pointer hover:shadow transition bg-white"
+              class="flex items-center gap-4 border rounded-lg p-4 cursor-pointer hover:shadow transition bg-white"
               @click="$router.push(`/product/${rel.product_id}`)"
             >
-              <img :src="rel.image_url" :alt="rel.name" class="w-16 h-16 object-contain rounded" />
-              <p class="font-medium">{{ rel.name }}</p>
+              <img :src="rel.image_url" :alt="rel.name" class="w-24 h-24 object-contain rounded" />
+              <p class="font-medium text-lg">{{ rel.name }}</p>
             </div>
           </div>
         </div>
-      </div>
-    </transition>
+      </transition>
+    </div>
   </div>
 </template>
 
@@ -160,6 +172,17 @@ const userRating = ref(0)
 const { cartItems, fetchCart, addToCart, updateCartItem, removeFromCart } = useCart()
 const { favorites, fetchFavorites, addFavorite, removeFavorite } = useFavorites()
 
+// Вычисляемое свойство для нового URL картинки продукта
+const productImage = computed(() => {
+  if (!product.value?.image_url) return ''
+  const url = product.value.image_url
+  const lastDot = url.lastIndexOf('.')
+  if (lastDot === -1) return url
+  const base = url.substring(0, lastDot)
+  const ext = url.substring(lastDot)
+  return `${base}_1${ext}`
+})
+
 const loadProduct = async () => {
   try {
     const [prodResp, relResp, ratingResp] = await Promise.all([
@@ -169,7 +192,7 @@ const loadProduct = async () => {
         .get(`http://127.0.0.1:8000/api/v1/products/${productId.value}/rating`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
         })
-        .catch(() => ({ data: { average_rating: null, user_rating: 0 } })), // если не авторизован
+        .catch(() => ({ data: { average_rating: null, user_rating: 0 } })),
     ])
     product.value = prodResp.data
     relatedProducts.value = relResp.data
@@ -281,6 +304,7 @@ watch(
 </script>
 
 <style scoped>
+/* Анимация прозрачности */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.4s ease;
@@ -288,5 +312,21 @@ watch(
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Анимация выезда снизу */
+.slide-up-enter-active {
+  transition: all 0.5s ease-out;
+}
+.slide-up-leave-active {
+  transition: all 0.3s ease-in;
+}
+.slide-up-enter-from {
+  opacity: 0;
+  transform: translateY(30px);
+}
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
 }
 </style>
