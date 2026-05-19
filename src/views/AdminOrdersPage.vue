@@ -94,11 +94,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 
 const orders = ref([])
 const loading = ref(true)
+let intervalId = null
 
 const statusText = (status) => {
   const map = {
@@ -121,10 +122,9 @@ const fetchOrders = async () => {
     })
     orders.value = resp.data
   } catch (e) {
-    alert('Ошибка загрузки заказов')
-    console.error(e)
+    console.error('Ошибка загрузки заказов')
   } finally {
-    loading.value = false
+    if (loading.value) loading.value = false
   }
 }
 
@@ -143,5 +143,14 @@ const updateStatus = async (orderId, newStatus) => {
   }
 }
 
-onMounted(fetchOrders)
+onMounted(() => {
+  fetchOrders()
+  // Запускаем интервал обновления каждые 2 минуты
+  intervalId = setInterval(fetchOrders, 120000)
+})
+
+// Очищаем интервал при уходе со страницы
+onBeforeUnmount(() => {
+  if (intervalId) clearInterval(intervalId)
+})
 </script>

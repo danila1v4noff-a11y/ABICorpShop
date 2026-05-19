@@ -188,3 +188,11 @@ def update_order_status(
 
     db.commit()
     return {"status": "updated"}
+
+@router_admin.get("/pending-count")
+def get_pending_orders_count(
+    manager: User = Depends(require_manager),
+    db: Session = Depends(get_db)
+):
+    count = db.query(EmployeeOrder).filter(EmployeeOrder.Status == "pending").count()
+    return {"pending_count": count}

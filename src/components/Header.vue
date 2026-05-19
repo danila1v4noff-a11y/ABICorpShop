@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCart } from '../composables/useCart'
+import axios from 'axios'
 
-const emit = defineEmits(['toggleDrawer', 'update:searchQuery'])
+const emit = defineEmits(['toggleDrawer'])
 const router = useRouter()
 
 const addresses = ['Дворянская 27АК17', 'Ленина 15АК17', 'Пушкина 10АК17', 'Гагарина 5АК17']
@@ -23,6 +24,7 @@ const cartCount = computed(() => cartItems.value.reduce((sum, item) => sum + ite
 
 const user = ref(null)
 const isManager = computed(() => user.value?.is_manager === true)
+const pendingCount = ref(0)
 
 const loadUser = () => {
   const userStr = localStorage.getItem('user')
@@ -40,27 +42,45 @@ const logout = () => {
 const goToProfile = () => router.push('/profile')
 const goToCart = () => router.push('/cart')
 
-// Поиск с debounce
+// Поиск
 const searchQuery = ref('')
 let debounceTimer = null
-watch(searchQuery, (newVal) => {
+const emitSearch = () => {
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => {
-    emit('update:searchQuery', newVal)
-  }, 1000) // 1 секунда задержки
-})
+    emit('update:searchQuery', searchQuery.value)
+  }, 1000)
+}
+
+// Загрузка количества pending заказов для менеджера
+const fetchPendingCount = async () => {
+  if (!isManager.value) return
+  try {
+    const token = localStorage.getItem('access_token')
+    const resp = await axios.get('http://127.0.0.1:8000/api/v1/admin/orders/pending-count', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    pendingCount.value = resp.data.pending_count
+  } catch (e) {
+    console.error('Ошибка загрузки количества pending заказов')
+  }
+}
 
 onMounted(() => {
   loadUser()
   fetchCart()
+  fetchPendingCount()
 })
 </script>
 
 <template>
   <header class="bg-[#FF4E4E] px-12 pb-4">
     <div class="flex justify-between items-center">
-      <div><img src="/Logo.svg" alt="Logo" class="w-40" /></div>
+      <div>
+        <img src="/Logo.svg" alt="Logo" class="w-40" />
+      </div>
       <div class="flex items-center gap-3">
+        <!-- Корзина -->
         <div class="relative mr-5 cursor-pointer" @click="goToCart">
           <img src="/Order.png" alt="Order" class="w-10" />
           <span
@@ -69,14 +89,25 @@ onMounted(() => {
             >{{ cartCount }}</span
           >
         </div>
-        <router-link v-if="isManager" to="/admin/orders" class="mr-3 cursor-pointer"
-          ><img src="/Box.svg" alt="Заказы" class="w-10"
-        /></router-link>
+
+        <!-- Иконка заказов для менеджера + счётчик pending -->
+        <router-link v-if="isManager" to="/admin/orders" class="relative mr-3 cursor-pointer">
+          <img src="/Box.svg" alt="Заказы" class="w-10" />
+          <span
+            v-if="pendingCount > 0"
+            class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"
+            >{{ pendingCount }}</span
+          >
+        </router-link>
+
+        <!-- Авторизация -->
         <div v-if="user" class="flex items-center gap-3">
           <span class="text-white font-medium">{{ user.fio }}</span>
           <button @click="logout" class="text-sm text-white/80 hover:text-white">Выйти</button>
         </div>
         <router-link v-else to="/login" class="text-white hover:underline">Войти</router-link>
+
+        <!-- Профиль и адрес -->
         <div class="relative flex items-center gap-2">
           <img src="/Employee.svg" alt="Profile" class="w-10 cursor-pointer" @click="goToProfile" />
           <b
@@ -116,6 +147,7 @@ onMounted(() => {
             v-model="searchQuery"
             type="text"
             placeholder="Поиск..."
+            @input="emitSearch"
             class="w-full py-2 pl-12 pr-4 bg-white border border-gray-400 rounded-full focus:outline-none focus:ring-1 focus:ring-gray-400"
           />
         </div>

@@ -67,7 +67,19 @@ const handleLogin = async () => {
     const token = response.data.access_token
     localStorage.setItem('access_token', token)
     await fetchUserData(token)
-    router.push('/')
+
+    // Определяем роль и направляем
+    const userStr = localStorage.getItem('user')
+    if (userStr) {
+      const user = JSON.parse(userStr)
+      if (user.is_manager) {
+        router.push('/admin/orders')
+      } else {
+        router.push('/')
+      }
+    } else {
+      router.push('/')
+    }
   } catch (err) {
     error.value = err.response?.data?.detail || 'Ошибка входа'
   } finally {

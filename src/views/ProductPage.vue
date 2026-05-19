@@ -2,6 +2,12 @@
   <div class="min-h-screen bg-gray-100 p-8">
     <transition name="fade" appear>
       <div v-if="product" class="max-w-6xl mx-auto">
+        <img
+          src="/Logo.svg"
+          alt="Логотип"
+          class="absolute top-0 left-4 h-12 w-auto mt-4 cursor-pointer"
+          @click="$router.push('/')"
+        />
         <!-- Кнопка назад -->
         <div class="mb-4">
           <img
