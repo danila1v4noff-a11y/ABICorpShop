@@ -12,6 +12,14 @@
 
     <div class="max-w-6xl mx-auto">
       <h1 class="text-3xl font-bold mb-6">Управление заказами</h1>
+      <div class="flex justify-between items-center mb-6">
+        <router-link
+          to="/admin/blacklist"
+          class="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded"
+        >
+          Чёрный список
+        </router-link>
+      </div>
       <div v-if="loading" class="text-center">Загрузка...</div>
       <div v-else class="space-y-6">
         <div v-for="order in orders" :key="order.order_id" class="bg-white rounded-lg shadow p-6">

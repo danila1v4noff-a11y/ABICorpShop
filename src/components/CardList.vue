@@ -55,8 +55,6 @@ const handleAddToCart = async (productId) => {
     alert('Для добавления в корзину необходимо авторизоваться')
     return
   }
-  const currentQty = getCartQuantity(productId)
-  if (currentQty >= 15) return
   try {
     const item = cartItems.value.find((i) => i.product_id === productId)
     if (item) {
@@ -64,8 +62,9 @@ const handleAddToCart = async (productId) => {
     } else {
       await addToCart(productId, 1)
     }
-  } catch {
-    alert('Не удалось изменить количество')
+  } catch (err) {
+    // Показываем конкретную причину от сервера (например, чёрный список)
+    alert(err.response?.data?.detail || 'Не удалось изменить количество')
   }
 }
 
@@ -84,8 +83,8 @@ const handleDecrement = async (productId) => {
         await removeFromCart(item.cart_item_id)
       }
     }
-  } catch {
-    alert('Не удалось изменить количество')
+  } catch (err) {
+    alert(err.response?.data?.detail || 'Не удалось изменить количество')
   }
 }
 
@@ -101,11 +100,10 @@ const handleToggleFavorite = async (productId) => {
     } else {
       await addFavorite(productId)
     }
-  } catch {
-    alert('Не удалось изменить избранное')
+  } catch (err) {
+    alert(err.response?.data?.detail || 'Не удалось изменить избранное')
   }
 }
-
 watch(
   () => [props.searchQuery, props.categoryNames],
   () => loadProducts(),

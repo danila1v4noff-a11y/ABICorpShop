@@ -6,6 +6,7 @@ import LoginPage from '../views/LoginPage.vue'
 import SharedCartPage from '../views/SharedCartPage.vue'
 import AdminOrdersPage from '../views/AdminOrdersPage.vue'
 import ProductPage from '../views/ProductPage.vue'
+import BlacklistPage from '../views/BlacklistPage.vue'
 
 const routes = [
   {
@@ -48,6 +49,12 @@ const routes = [
     name: 'Product',
     component: ProductPage,
     meta: { requiresAuth: false }, // можно без авторизации, но корзина/избранное требуют токен
+  },
+  {
+    path: '/admin/blacklist',
+    name: 'Blacklist',
+    component: BlacklistPage,
+    meta: { requiresAuth: true, requiresManager: true },
   },
 ]
 

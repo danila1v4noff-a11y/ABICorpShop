@@ -1,15 +1,17 @@
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional
 
 class SharedCartItemResponse(BaseModel):
     id: int
     product_id: int
     product_name: str
-    price: float
+    price: float                    # исходная цена
+    discount_price: Optional[float] = None  # цена со скидкой (если есть)
     quantity: int
     added_by_user_name: str
     added_by_user_id: int
-    image_url: str | None = None
+    image_url: Optional[str] = None
 
     class Config:
         from_attributes = True

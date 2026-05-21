@@ -6,6 +6,7 @@ from app.models.cart import CartItem
 from app.models.product import Product
 from app.models.user import User
 from app.models.batch import Batch
+from app.models.blacklist import Blacklist
 from app.schemas.cart import CartItemCreate, CartItemUpdate, CartItemResponse, CartResponse
 from app.api.v1.endpoints.auth import get_current_user
 
@@ -65,15 +66,23 @@ def add_to_cart(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Проверка чёрного списка
+    blacklist_entry = db.query(Blacklist).filter(Blacklist.UserID == current_user.EmployeeID).first()
+    if blacklist_entry:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Вы находитесь в чёрном списке. Причина: {blacklist_entry.Reason}"
+        )
+
     product = db.query(Product).filter(Product.ProductID == item_in.product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Товар не найден")
-    
+
     existing_item = db.query(CartItem).filter(
         CartItem.UserID == current_user.EmployeeID,
         CartItem.ProductID == item_in.product_id
     ).first()
-    
+
     if existing_item:
         existing_item.Quantity += item_in.quantity
         db.commit()
@@ -88,7 +97,7 @@ def add_to_cart(
         db.add(cart_item)
         db.commit()
         db.refresh(cart_item)
-    
+
     # Рассчитываем ответ с учётом скидки
     threshold = date.today() + timedelta(days=14)
     has_expiring = db.query(Batch).filter(
@@ -125,16 +134,16 @@ def update_cart_item(
     ).first()
     if not cart_item:
         raise HTTPException(status_code=404, detail="Элемент корзины не найден")
-    
+
     if item_update.quantity <= 0:
         db.delete(cart_item)
         db.commit()
         raise HTTPException(status_code=204, detail="Элемент удалён")
-    
+
     cart_item.Quantity = item_update.quantity
     db.commit()
     db.refresh(cart_item)
-    
+
     product = cart_item.product
     threshold = date.today() + timedelta(days=14)
     has_expiring = db.query(Batch).filter(

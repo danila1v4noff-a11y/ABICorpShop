@@ -7,3 +7,4 @@ from .order import EmployeeOrder, OrderItem
 from .category import Category
 from .batch import Batch
 from .rating import ProductRating
+from .blacklist import Blacklist

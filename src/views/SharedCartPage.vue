@@ -27,7 +27,15 @@
             <div class="flex-1">
               <p class="font-semibold">{{ item.product_name }}</p>
               <p class="text-sm text-gray-600">Добавил: {{ item.added_by_user_name }}</p>
-              <p class="text-sm text-gray-600">{{ item.price }} руб. × {{ item.quantity }}</p>
+              <!-- Цена со скидкой (уже работает) -->
+              <p class="text-sm text-gray-600">
+                <template v-if="item.discount_price">
+                  <span class="line-through text-red-400 mr-2">{{ item.price }} руб.</span>
+                  <span class="font-semibold text-gray-800">{{ item.discount_price }} руб.</span>
+                </template>
+                <template v-else> {{ item.price }} руб. </template>
+                × {{ item.quantity }}
+              </p>
             </div>
 
             <!-- Кнопки для автора позиции (не владельца) -->
@@ -51,13 +59,13 @@
               </button>
             </div>
 
-            <!-- Владелец видит только просмотр (управление через его корзину) -->
+            <!-- Владелец видит только просмотр -->
             <div v-else class="text-gray-500">× {{ item.quantity }}</div>
           </div>
         </div>
       </div>
 
-      <!-- Блок добавления товаров (для всех) -->
+      <!-- Блок добавления товаров (со скидкой!) -->
       <div class="bg-white rounded-lg shadow p-6 mb-6">
         <h2 class="text-xl font-semibold mb-4">Добавить товар</h2>
         <div v-if="products.length" class="grid grid-cols-2 gap-4">
@@ -69,7 +77,16 @@
             <img :src="product.image_url" alt="product" class="w-12 h-12 object-contain rounded" />
             <div class="flex-1">
               <p class="font-medium">{{ product.name }}</p>
-              <p class="text-gray-600">{{ product.price }} руб.</p>
+              <!-- Цена с учётом скидки -->
+              <p class="text-gray-600">
+                <template v-if="product.has_expiring">
+                  <span class="line-through text-red-400 mr-2">{{ product.price }} руб.</span>
+                  <span class="font-semibold text-gray-800"
+                    >{{ Math.round(product.price * 0.6) }} руб.</span
+                  >
+                </template>
+                <template v-else> {{ product.price }} руб. </template>
+              </p>
             </div>
             <button
               @click="addProduct(product.product_id)"
@@ -84,7 +101,6 @@
     </div>
   </div>
 </template>
-
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -103,7 +119,6 @@ const isOwner = computed(() => {
   return cart.value.owner_id === currentUserId.value
 })
 
-// Является ли текущий пользователь автором данного элемента
 const isAuthorOf = (item) => {
   return currentUserId.value === item.added_by_user_id
 }

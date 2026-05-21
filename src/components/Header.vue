@@ -90,9 +90,13 @@ onMounted(() => {
           >
         </div>
 
-        <!-- Иконка заказов для менеджера + счётчик pending -->
+        <!-- Колокольчик для менеджера (меняется иконка) -->
         <router-link v-if="isManager" to="/admin/orders" class="relative mr-3 cursor-pointer">
-          <img src="/Box.svg" alt="Заказы" class="w-10" />
+          <img
+            :src="pendingCount > 0 ? '/Bell_on.svg' : '/Bell_off.svg'"
+            alt="Уведомления"
+            class="w-10"
+          />
           <span
             v-if="pendingCount > 0"
             class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"

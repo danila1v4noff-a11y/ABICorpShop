@@ -12,6 +12,8 @@ from app.api.v1.endpoints.favorites import router as favorites_router
 from app.api.v1.endpoints.shared_cart import router as shared_cart_router
 from app.api.v1.endpoints.orders import router as orders_router, router_admin
 from app.api.v1.endpoints.categories import router as categories_router
+from app.api.v1.endpoints.users import router as users_router
+from app.api.v1.endpoints.blacklist import router as blacklist_router
 
 
 app = FastAPI(
@@ -38,6 +40,8 @@ app.include_router(shared_cart_router, prefix="/api/v1")   # <-- добавле�
 app.include_router(orders_router, prefix="/api/v1")
 app.include_router(router_admin, prefix="/api/v1")
 app.include_router(categories_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")
+app.include_router(blacklist_router, prefix="/api/v1")
 
 @app.get("/")
 async def root():

@@ -82,6 +82,11 @@
                 <span class="font-semibold text-xl w-24">Вес:</span>
                 <span class="text-xl">{{ product.weight }} гр.</span>
               </div>
+              <!-- НОВАЯ СТРОКА: цена за кг -->
+              <div class="flex gap-4 items-baseline">
+                <span class="font-semibold text-xl w-24">Цена за кг:</span>
+                <span class="text-xl">{{ pricePerKg }} руб.</span>
+              </div>
               <div class="flex gap-4 items-baseline" v-if="product.expiration_date">
                 <span class="font-semibold text-xl w-24">Срок годности:</span>
                 <span class="text-xl">{{
@@ -181,6 +186,12 @@ const productImage = computed(() => {
   const base = url.substring(0, lastDot)
   const ext = url.substring(lastDot)
   return `${base}_1${ext}`
+})
+
+// НОВОЕ: цена за кг
+const pricePerKg = computed(() => {
+  if (!product.value?.weight || product.value.weight === 0) return 0
+  return Math.round((product.value.price / (product.value.weight / 1000)) * 100) / 100
 })
 
 const loadProduct = async () => {
