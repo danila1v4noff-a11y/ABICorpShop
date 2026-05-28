@@ -14,6 +14,7 @@ from app.api.v1.endpoints.orders import router as orders_router, router_admin
 from app.api.v1.endpoints.categories import router as categories_router
 from app.api.v1.endpoints.users import router as users_router
 from app.api.v1.endpoints.blacklist import router as blacklist_router
+from app.api.v1.endpoints.pickup import router as pickup_router
 
 
 app = FastAPI(
@@ -42,6 +43,7 @@ app.include_router(router_admin, prefix="/api/v1")
 app.include_router(categories_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(blacklist_router, prefix="/api/v1")
+app.include_router(pickup_router, prefix="/api/v1")
 
 @app.get("/")
 async def root():

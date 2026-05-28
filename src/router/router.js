@@ -7,6 +7,7 @@ import SharedCartPage from '../views/SharedCartPage.vue'
 import AdminOrdersPage from '../views/AdminOrdersPage.vue'
 import ProductPage from '../views/ProductPage.vue'
 import BlacklistPage from '../views/BlacklistPage.vue'
+import RulesPage from '../views/RulesPage.vue'
 
 const routes = [
   {
@@ -55,6 +56,12 @@ const routes = [
     name: 'Blacklist',
     component: BlacklistPage,
     meta: { requiresAuth: true, requiresManager: true },
+  },
+  {
+    path: '/rules',
+    name: 'Rules',
+    component: RulesPage,
+    meta: { requiresAuth: false },
   },
 ]
 

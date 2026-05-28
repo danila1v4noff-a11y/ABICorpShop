@@ -40,6 +40,7 @@ class OrderResponse(BaseModel):
     total_weight: int
     created_at: datetime
     items: list[OrderItemResponse]
+    cancelled_by_user: bool = False
 
     class Config:
         from_attributes = True

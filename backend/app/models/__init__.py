@@ -8,3 +8,4 @@ from .category import Category
 from .batch import Batch
 from .rating import ProductRating
 from .blacklist import Blacklist
+from .pickup_slot import PickupSlot

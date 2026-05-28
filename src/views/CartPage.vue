@@ -135,14 +135,19 @@
                       v-for="d in pickupDates"
                       :key="d.value"
                       @click="selectedPickupDate = d.value"
+                      :disabled="getDateRemaining(d.value) === 0"
                       class="text-sm border rounded px-2 py-1 transition"
-                      :class="
-                        selectedPickupDate === d.value
-                          ? 'bg-[#FFA100] text-white border-[#FFA100]'
-                          : 'border-gray-300 hover:border-[#FFA100]'
-                      "
+                      :class="{
+                        'bg-[#FFA100] text-white border-[#FFA100]': selectedPickupDate === d.value,
+                        'border-gray-300 hover:border-[#FFA100]':
+                          selectedPickupDate !== d.value && getDateRemaining(d.value) > 0,
+                        'opacity-50 cursor-not-allowed': getDateRemaining(d.value) === 0,
+                      }"
                     >
                       {{ d.label }}
+                      <span class="block text-xs mt-1" v-if="getDateRemaining(d.value) !== null">
+                        ({{ getDateRemaining(d.value) }} мест)
+                      </span>
                     </button>
                   </div>
                   <div class="grid grid-cols-2 gap-2">
@@ -150,14 +155,24 @@
                       v-for="slot in pickupSlots"
                       :key="slot.value"
                       @click="selectedPickupSlot = slot"
+                      :disabled="!selectedPickupDate || getSlotRemaining(slot.value) === 0"
                       class="text-sm border rounded px-2 py-1 transition"
-                      :class="
-                        selectedPickupSlot?.value === slot.value
-                          ? 'bg-[#FFA100] text-white border-[#FFA100]'
-                          : 'border-gray-300 hover:border-[#FFA100]'
-                      "
+                      :class="{
+                        'bg-[#FFA100] text-white border-[#FFA100]':
+                          selectedPickupSlot?.value === slot.value,
+                        'border-gray-300 hover:border-[#FFA100]':
+                          selectedPickupSlot?.value !== slot.value &&
+                          getSlotRemaining(slot.value) > 0,
+                        'opacity-50 cursor-not-allowed': getSlotRemaining(slot.value) === 0,
+                      }"
                     >
                       {{ slot.label }}
+                      <span
+                        class="block text-xs mt-1"
+                        v-if="selectedPickupDate && getSlotRemaining(slot.value) !== null"
+                      >
+                        ({{ getSlotRemaining(slot.value) }} мест)
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -191,10 +206,8 @@
                   />
                   <span>СБП</span>
                 </label>
-                <label
-                  v-if="deliveryMethod === 'pickup'"
-                  class="flex items-center gap-3 cursor-pointer"
-                >
+                <!-- Картой доступно всегда -->
+                <label class="flex items-center gap-3 cursor-pointer">
                   <input
                     type="radio"
                     name="payment"
@@ -204,7 +217,11 @@
                   />
                   <span>Картой</span>
                 </label>
-                <label class="flex items-center gap-3 cursor-pointer">
+                <!-- Наличные только при самовывозе -->
+                <label
+                  v-if="deliveryMethod === 'pickup'"
+                  class="flex items-center gap-3 cursor-pointer"
+                >
                   <input
                     type="radio"
                     name="payment"
@@ -350,7 +367,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { useCart } from '../composables/useCart'
@@ -366,7 +383,7 @@ const selectedOffice = ref(null)
 const selectedCabinet = ref('')
 
 const deliveryMethod = ref('delivery')
-const paymentMethod = ref('cash')
+const paymentMethod = ref('sbp')
 
 const selectedPickupDate = ref(null)
 const selectedPickupSlot = ref(null)
@@ -409,6 +426,43 @@ const pickupSlots = [
   { label: '10:00 – 12:00', value: '10-12' },
   { label: '14:00 – 16:00', value: '14-16' },
 ]
+
+// === Логика слотов ===
+const availableSlots = ref([])
+
+const fetchAvailableSlots = async () => {
+  try {
+    const resp = await axios.get('http://127.0.0.1:8000/api/v1/pickup-slots/available')
+    availableSlots.value = resp.data
+  } catch (e) {
+    console.error('Ошибка загрузки слотов')
+  }
+}
+
+// Сумма оставшихся мест по всем слотам на дату
+const getDateRemaining = (dateStr) => {
+  if (!availableSlots.value.length) return null
+  return availableSlots.value
+    .filter((s) => s.date === dateStr)
+    .reduce((sum, s) => sum + s.remaining, 0)
+}
+
+// Оставшиеся места в конкретном слоте на выбранную дату
+const getSlotRemaining = (timeSlot) => {
+  const selDate = selectedPickupDate.value
+  if (!selDate || !availableSlots.value.length) return null
+  const slot = availableSlots.value.find((s) => s.date === selDate && s.time_slot === timeSlot)
+  return slot ? slot.remaining : 0
+}
+
+// Переключение на самовывоз – подгружаем слоты
+watch(deliveryMethod, (newVal) => {
+  if (newVal === 'pickup') {
+    fetchAvailableSlots()
+  }
+})
+
+// === Остальные функции без изменений ===
 
 const setPickup = () => {
   deliveryMethod.value = 'pickup'
@@ -486,6 +540,10 @@ const submitOrder = async () => {
       sharedToken.value = ''
       sharedCart.value = null
     }
+    // Обновляем слоты после успешного заказа
+    if (deliveryMethod.value === 'pickup') {
+      fetchAvailableSlots()
+    }
     return true
   } catch (err) {
     console.error(err)
@@ -533,26 +591,28 @@ const combinedItems = computed(() => {
     cart_item_id: null,
     product_id: item.product_id,
     product_name: item.product_name,
-    price: item.price,
+    price: item.price, // исходная цена
+    discount_price: item.discount_price, // <-- теперь берём из ответа API
     image_url: item.image_url,
     quantity: item.quantity,
     isShared: true,
     added_by_user_name: item.added_by_user_name,
     shared_item_id: item.id,
-    discount_price: null,
   }))
 
   const merged = [...personal, ...shared].sort((a, b) =>
     a.product_name.localeCompare(b.product_name, 'ru'),
   )
-  console.log('combinedItems пересчитан, элементов:', merged.length)
   return merged
 })
 
 const totalSumCombined = computed(() => {
   let sum = totalSum.value
   if (sharedCart.value) {
-    sum += sharedCart.value.items.reduce((acc, item) => acc + item.price * item.quantity, 0)
+    sum += sharedCart.value.items.reduce((acc, item) => {
+      const price = item.discount_price || item.price
+      return acc + price * item.quantity
+    }, 0)
   }
   return sum
 })
@@ -723,5 +783,7 @@ onMounted(async () => {
     sharedToken.value = savedSharedToken
     await loadSharedCart()
   }
+  // Первоначальная загрузка слотов
+  fetchAvailableSlots()
 })
 </script>

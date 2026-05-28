@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sqlfunc, asc
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 
 from app.core.database import get_db
 from app.models.user import User
@@ -10,6 +10,7 @@ from app.models.cart import CartItem
 from app.models.order import EmployeeOrder, OrderItem
 from app.models.shared_cart import SharedCart
 from app.models.batch import Batch
+from app.models.pickup_slot import PickupSlot
 from app.schemas.order import OrderCreate, OrderResponse, OrderStatusUpdate
 from app.api.v1.endpoints.auth import get_current_user
 
@@ -40,8 +41,36 @@ def format_order(order):
             "quantity": oi.Quantity,
             "total_price": float(oi.PriceAtOrder) * oi.Quantity,
             "image_url": oi.product.ImageURL
-        } for oi in order.items]
+        } for oi in order.items],
+        cancelled_by_user=(order.Status == 'cancelled' and order.ProcessedBy is None)
     )
+
+def _book_pickup_slot(db: Session, pickup_date: date, time_slot: str):
+    """Увеличивает счётчик бронирований слота (создаёт запись, если нужно)."""
+    slot = db.query(PickupSlot).filter(
+        PickupSlot.PickupDate == pickup_date,
+        PickupSlot.TimeSlot == time_slot
+    ).first()
+    if slot:
+        slot.BookedCount += 1
+    else:
+        slot = PickupSlot(
+            PickupDate=pickup_date,
+            TimeSlot=time_slot,
+            BookedCount=1
+        )
+        db.add(slot)
+    db.commit()
+
+def _release_pickup_slot(db: Session, pickup_date: date, time_slot: str):
+    """Уменьшает счётчик бронирований слота (но не ниже 0)."""
+    slot = db.query(PickupSlot).filter(
+        PickupSlot.PickupDate == pickup_date,
+        PickupSlot.TimeSlot == time_slot
+    ).first()
+    if slot and slot.BookedCount > 0:
+        slot.BookedCount -= 1
+        db.commit()
 
 @router.post("/", response_model=OrderResponse)
 def create_order(
@@ -60,7 +89,6 @@ def create_order(
         if item_in.quantity > MAX_ITEM_QUANTITY:
             raise HTTPException(status_code=400, detail=f"Максимальное количество '{product.Name}' – {MAX_ITEM_QUANTITY} шт")
 
-        # Проверяем доступное количество (сумма по партиям)
         available = db.query(sqlfunc.coalesce(sqlfunc.sum(Batch.Quantity), 0))\
                       .filter(Batch.ProductID == product.ProductID).scalar()
         if item_in.quantity > available:
@@ -70,6 +98,15 @@ def create_order(
 
     if total_weight > MAX_WEIGHT:
         raise HTTPException(status_code=400, detail="Общий вес заказа превышает 25 кг")
+
+    # Проверка доступности слота самовывоза (если выбран)
+    if order_data.delivery_method == 'pickup' and order_data.delivery_date and order_data.delivery_time_slot:
+        slot = db.query(PickupSlot).filter(
+            PickupSlot.PickupDate == order_data.delivery_date,
+            PickupSlot.TimeSlot == order_data.delivery_time_slot
+        ).first()
+        if slot and slot.BookedCount >= slot.MaxCapacity:
+            raise HTTPException(status_code=400, detail="Выбранный временной слот уже заполнен")
 
     total_amount = sum(
         float(db.query(Product).filter(Product.ProductID == item.product_id).first().Price) * item.quantity
@@ -95,7 +132,6 @@ def create_order(
     for item_in in order_data.items:
         product = db.query(Product).get(item_in.product_id)
         remaining = item_in.quantity
-        # Получаем партии, отсортированные по дате окончания (сначала истекающие)
         batches = db.query(Batch).filter(
             Batch.ProductID == product.ProductID,
             Batch.Quantity > 0
@@ -110,7 +146,6 @@ def create_order(
             if batch.Quantity == 0:
                 db.delete(batch)
 
-        # Создаём запись OrderItem
         order_item = OrderItem(
             OrderID=order.OrderID,
             ProductID=product.ProductID,
@@ -119,16 +154,20 @@ def create_order(
         )
         db.add(order_item)
 
-    # Очищаем личную корзину пользователя
+    # Очистка корзины
     db.query(CartItem).filter(CartItem.UserID == current_user.EmployeeID).delete()
 
-    # Деактивируем активную общую корзину пользователя (если есть)
+    # Деактивация общей корзины
     shared = db.query(SharedCart).filter(
         SharedCart.owner_id == current_user.EmployeeID,
         SharedCart.is_active == True
     ).first()
     if shared:
         shared.is_active = False
+
+    # Бронирование слота самовывоза
+    if order_data.delivery_method == 'pickup' and order_data.delivery_date and order_data.delivery_time_slot:
+        _book_pickup_slot(db, order_data.delivery_date, order_data.delivery_time_slot)
 
     db.commit()
     db.refresh(order)
@@ -144,6 +183,42 @@ def get_my_orders(
         EmployeeOrder.UserID == current_user.EmployeeID
     ).order_by(EmployeeOrder.CreatedAt.desc()).all()
     return [format_order(o) for o in orders]
+
+
+@router.post("/{order_id}/cancel")
+def cancel_order_by_user(
+    order_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    order = db.query(EmployeeOrder).filter(EmployeeOrder.OrderID == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+    if order.UserID != current_user.EmployeeID:
+        raise HTTPException(status_code=403, detail="Вы не можете отменить чужой заказ")
+    if order.Status != 'pending':
+        raise HTTPException(status_code=400, detail="Заказ уже обработан или отменён")
+
+    elapsed = datetime.now(timezone.utc) - order.CreatedAt
+    if elapsed > timedelta(minutes=5):
+        raise HTTPException(status_code=400, detail="Время для отмены истекло (5 минут)")
+
+    # Возврат товаров
+    order.Status = 'cancelled'
+    for item in order.items:
+        return_batch = Batch(
+            ProductID=item.ProductID,
+            Quantity=item.Quantity,
+            ExpirationDate=date.today() + timedelta(days=14)
+        )
+        db.add(return_batch)
+
+    # Освобождение слота самовывоза
+    if order.DeliveryMethod == 'pickup' and order.DeliveryDate and order.DeliveryTimeSlot:
+        _release_pickup_slot(db, order.DeliveryDate, order.DeliveryTimeSlot)
+
+    db.commit()
+    return {"status": "cancelled"}
 
 
 # Админский роутер
@@ -176,15 +251,17 @@ def update_order_status(
     order.Status = status_update.status
     order.ProcessedBy = manager.EmployeeID
 
-    # При отмене/отклонении возвращаем товары в партии
+    # При отмене/отклонении возвращаем товары и освобождаем слот
     if status_update.status in ('rejected', 'cancelled') and old_status not in ('rejected', 'cancelled'):
         for item in order.items:
             return_batch = Batch(
                 ProductID=item.ProductID,
                 Quantity=item.Quantity,
-                ExpirationDate=date.today() + timedelta(days=14)  # условный срок годности возврата
+                ExpirationDate=date.today() + timedelta(days=14)
             )
             db.add(return_batch)
+        if order.DeliveryMethod == 'pickup' and order.DeliveryDate and order.DeliveryTimeSlot:
+            _release_pickup_slot(db, order.DeliveryDate, order.DeliveryTimeSlot)
 
     db.commit()
     return {"status": "updated"}

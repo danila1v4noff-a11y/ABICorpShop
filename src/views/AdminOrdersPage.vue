@@ -28,6 +28,12 @@
               <p class="font-semibold">Заказ №{{ order.order_id }}</p>
               <p class="text-sm text-gray-600">Сотрудник: {{ order.user_name }}</p>
               <p class="text-sm">Статус: {{ statusText(order.status) }}</p>
+              <div
+                v-if="order.status === 'cancelled' && order.cancelled_by_user"
+                class="mt-2 text-red-600 font-bold text-lg border-2 border-red-500 rounded p-2 bg-red-50"
+              >
+                ⚠ Заказ отменён сотрудником
+              </div>
               <p class="text-sm">
                 Способ получения:
                 {{ order.delivery_method === 'delivery' ? 'Доставка' : 'Самовывоз' }}

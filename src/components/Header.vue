@@ -103,7 +103,9 @@ onMounted(() => {
             >{{ pendingCount }}</span
           >
         </router-link>
-
+        <router-link to="/rules" class="relative mr-3 cursor-pointer">
+          <img src="/Rule.svg" alt="Правила" class="w-10" />
+        </router-link>
         <!-- Авторизация -->
         <div v-if="user" class="flex items-center gap-3">
           <span class="text-white font-medium">{{ user.fio }}</span>

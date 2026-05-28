@@ -4,7 +4,7 @@
       <img
         src="/ArrowLeft.svg"
         alt="Назад"
-        class="w-8 h-8 cursor-pointer opacity-50 hover:opacity-100 transition-opacity duration-200"
+        class="w-8 h-8 cursor-pointer opacity-50 hover:opacity-100 transition-opacity"
         @click="goToHome"
       />
     </div>
@@ -58,7 +58,6 @@
           <h2 class="text-xl font-semibold mb-3 text-gray-800">Последние заказы</h2>
           <div v-if="orders.length === 0" class="text-gray-500 italic">Пусто</div>
           <div v-else class="space-y-4">
-            <!-- Показываем первые 2 или все, в зависимости от showAll -->
             <div
               v-for="order in displayedOrders"
               :key="order.order_id"
@@ -76,10 +75,17 @@
                   <span>{{ item.product_name }} × {{ item.quantity }}</span>
                 </div>
               </div>
+              <!-- Кнопка отмены для pending-заказов, созданных менее 5 минут назад -->
+              <button
+                v-if="canCancel(order)"
+                @click="cancelOrder(order.order_id)"
+                class="mt-2 bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-1 rounded"
+              >
+                Отменить заказ
+              </button>
             </div>
           </div>
 
-          <!-- Кнопка "Больше" / "Скрыть" -->
           <div v-if="orders.length > 2" class="flex justify-center mt-4">
             <button
               @click="toggleShowAll"
@@ -108,11 +114,9 @@ const router = useRouter()
 const userName = ref('Сотрудник')
 const { favorites, fetchFavorites, removeFavorite } = useFavorites()
 
-// Заказы
 const orders = ref([])
-const showAll = ref(false) // показать все или только 2
+const showAll = ref(false)
 
-// Вычисляем, какие заказы показывать
 const displayedOrders = computed(() => {
   if (showAll.value) return orders.value
   return orders.value.slice(0, 2)
@@ -143,13 +147,41 @@ const removeFromFavorites = async (productId) => {
   }
 }
 
-// Переключение режима показа заказов
 const toggleShowAll = () => {
   showAll.value = !showAll.value
 }
 
+// Проверка, можно ли отменить заказ
+const canCancel = (order) => {
+  if (order.status !== 'pending') return false
+  const created = new Date(order.created_at).getTime()
+  const now = Date.now()
+  return now - created < 5 * 60 * 1000 // 5 минут
+}
+
+// Отмена заказа
+const cancelOrder = async (orderId) => {
+  const token = localStorage.getItem('access_token')
+  if (!token) return
+  try {
+    await axios.post(
+      `http://127.0.0.1:8000/api/v1/orders/${orderId}/cancel`,
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    )
+    // Обновить список заказов
+    const resp = await axios.get('http://127.0.0.1:8000/api/v1/orders/', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    orders.value = resp.data
+  } catch (err) {
+    alert(err.response?.data?.detail || 'Ошибка при отмене заказа')
+  }
+}
+
 onMounted(async () => {
-  // Загрузка данных пользователя
   const userStr = localStorage.getItem('user')
   if (userStr) {
     try {
@@ -175,10 +207,8 @@ onMounted(async () => {
     }
   }
 
-  // Загрузка избранного
   await fetchFavorites()
 
-  // Загрузка заказов
   const token = localStorage.getItem('access_token')
   if (token) {
     try {
