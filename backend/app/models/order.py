@@ -32,6 +32,9 @@ class OrderItem(Base):
     ProductID = Column(Integer, ForeignKey("Products.ProductID"), nullable=False)
     Quantity = Column(Integer, nullable=False)
     PriceAtOrder = Column(Numeric(10, 2), nullable=False)
+    BatchID = Column(Integer, ForeignKey("Batches.BatchID"), nullable=True)
+    ExpirationDate = Column(Date, nullable=True)
 
     order = relationship("EmployeeOrder", back_populates="items")
     product = relationship("Product")
+    batch = relationship("Batch", back_populates="order_items")   

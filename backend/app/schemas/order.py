@@ -41,9 +41,11 @@ class OrderResponse(BaseModel):
     created_at: datetime
     items: list[OrderItemResponse]
     cancelled_by_user: bool = False
+    items: list[dict]   # или конкретный тип, если определён
 
     class Config:
         from_attributes = True
 
 class OrderStatusUpdate(BaseModel):
     status: str
+

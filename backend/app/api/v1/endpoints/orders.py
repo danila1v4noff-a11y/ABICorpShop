@@ -8,7 +8,7 @@ from app.models.user import User
 from app.models.product import Product
 from app.models.cart import CartItem
 from app.models.order import EmployeeOrder, OrderItem
-from app.models.shared_cart import SharedCart
+from app.models.shared_cart import SharedCart, SharedCartItem
 from app.models.batch import Batch
 from app.models.pickup_slot import PickupSlot
 from app.schemas.order import OrderCreate, OrderResponse, OrderStatusUpdate
@@ -40,13 +40,14 @@ def format_order(order):
             "price": float(oi.PriceAtOrder),
             "quantity": oi.Quantity,
             "total_price": float(oi.PriceAtOrder) * oi.Quantity,
-            "image_url": oi.product.ImageURL
+            "image_url": oi.product.ImageURL,
+            "batch_id": oi.BatchID,
+            "expiration_date": oi.ExpirationDate.isoformat() if oi.ExpirationDate else None
         } for oi in order.items],
         cancelled_by_user=(order.Status == 'cancelled' and order.ProcessedBy is None)
     )
 
 def _book_pickup_slot(db: Session, pickup_date: date, time_slot: str):
-    """Увеличивает счётчик бронирований слота (создаёт запись, если нужно)."""
     slot = db.query(PickupSlot).filter(
         PickupSlot.PickupDate == pickup_date,
         PickupSlot.TimeSlot == time_slot
@@ -63,7 +64,6 @@ def _book_pickup_slot(db: Session, pickup_date: date, time_slot: str):
     db.commit()
 
 def _release_pickup_slot(db: Session, pickup_date: date, time_slot: str):
-    """Уменьшает счётчик бронирований слота (но не ниже 0)."""
     slot = db.query(PickupSlot).filter(
         PickupSlot.PickupDate == pickup_date,
         PickupSlot.TimeSlot == time_slot
@@ -78,28 +78,55 @@ def create_order(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not order_data.items:
+    # Собираем все позиции из личной корзины
+    personal_items = db.query(CartItem).filter(CartItem.UserID == current_user.EmployeeID).all()
+    # Собираем позиции из активной общей корзины (где пользователь владелец)
+    shared_cart = db.query(SharedCart).filter(
+        SharedCart.owner_id == current_user.EmployeeID,
+        SharedCart.is_active == True
+    ).first()
+    shared_items = []
+    if shared_cart:
+        shared_items = db.query(SharedCartItem).filter(
+            SharedCartItem.shared_cart_id == shared_cart.id
+        ).all()
+
+    # Объединяем все позиции (product_id, quantity, batch_id)
+    all_items = []
+    for pi in personal_items:
+        all_items.append({
+            "product_id": pi.ProductID,
+            "quantity": pi.Quantity,
+            "batch_id": pi.BatchID
+        })
+    for si in shared_items:
+        all_items.append({
+            "product_id": si.product_id,
+            "quantity": si.quantity,
+            "batch_id": si.batch_id   # может быть None, если старая запись без партии
+        })
+
+    if not all_items:
         raise HTTPException(status_code=400, detail="Корзина пуста")
 
     total_weight = 0
-    for item_in in order_data.items:
-        product = db.query(Product).filter(Product.ProductID == item_in.product_id).first()
+    for item in all_items:
+        product = db.query(Product).get(item["product_id"])
         if not product:
-            raise HTTPException(status_code=400, detail=f"Товар с ID {item_in.product_id} не найден")
-        if item_in.quantity > MAX_ITEM_QUANTITY:
+            raise HTTPException(status_code=400, detail=f"Товар с ID {item['product_id']} не найден")
+        if item["quantity"] > MAX_ITEM_QUANTITY:
             raise HTTPException(status_code=400, detail=f"Максимальное количество '{product.Name}' – {MAX_ITEM_QUANTITY} шт")
-
         available = db.query(sqlfunc.coalesce(sqlfunc.sum(Batch.Quantity), 0))\
                       .filter(Batch.ProductID == product.ProductID).scalar()
-        if item_in.quantity > available:
+        if item["quantity"] > available:
             raise HTTPException(status_code=400, detail=f"Недостаточно товара '{product.Name}' на складе")
         if product.Weight:
-            total_weight += product.Weight * item_in.quantity
+            total_weight += product.Weight * item["quantity"]
 
     if total_weight > MAX_WEIGHT:
         raise HTTPException(status_code=400, detail="Общий вес заказа превышает 25 кг")
 
-    # Проверка доступности слота самовывоза (если выбран)
+    # Проверка доступности слота самовывоза
     if order_data.delivery_method == 'pickup' and order_data.delivery_date and order_data.delivery_time_slot:
         slot = db.query(PickupSlot).filter(
             PickupSlot.PickupDate == order_data.delivery_date,
@@ -108,10 +135,10 @@ def create_order(
         if slot and slot.BookedCount >= slot.MaxCapacity:
             raise HTTPException(status_code=400, detail="Выбранный временной слот уже заполнен")
 
-    total_amount = sum(
-        float(db.query(Product).filter(Product.ProductID == item.product_id).first().Price) * item.quantity
-        for item in order_data.items
-    )
+    total_amount = 0
+    for item in all_items:
+        product = db.query(Product).get(item["product_id"])
+        total_amount += float(product.Price) * item["quantity"]
 
     order = EmployeeOrder(
         UserID=current_user.EmployeeID,
@@ -128,42 +155,54 @@ def create_order(
     db.add(order)
     db.flush()
 
-    # Списание с партий по FIFO
-    for item_in in order_data.items:
-        product = db.query(Product).get(item_in.product_id)
-        remaining = item_in.quantity
-        batches = db.query(Batch).filter(
-            Batch.ProductID == product.ProductID,
-            Batch.Quantity > 0
-        ).order_by(asc(Batch.ExpirationDate)).all()
+    # Списание товаров и создание OrderItem
+    for item in all_items:
+        product = db.query(Product).get(item["product_id"])
+        remaining = item["quantity"]
+        batch_id = item.get("batch_id")
+        expiration_date = None   # <-- будем сохранять дату партии
 
-        for batch in batches:
-            if remaining <= 0:
-                break
-            take = min(remaining, batch.Quantity)
-            batch.Quantity -= take
-            remaining -= take
+        if batch_id:
+            # Прямое списание из указанной партии
+            batch = db.query(Batch).filter(Batch.BatchID == batch_id).first()
+            if not batch or batch.Quantity < remaining:
+                raise HTTPException(status_code=400, detail=f"Недостаточно товара '{product.Name}' в партии")
+            batch.Quantity -= remaining
+            expiration_date = batch.ExpirationDate   # запоминаем срок
             if batch.Quantity == 0:
                 db.delete(batch)
+        else:
+            # Списание по FIFO для позиций без привязки к партии
+            batches = db.query(Batch).filter(
+                Batch.ProductID == product.ProductID,
+                Batch.Quantity > 0
+            ).order_by(asc(Batch.ExpirationDate)).all()
+            for batch in batches:
+                take = min(remaining, batch.Quantity)
+                batch.Quantity -= take
+                remaining -= take
+                if batch.Quantity == 0:
+                    db.delete(batch)
+                if remaining == 0:
+                    break
+            if remaining > 0:
+                raise HTTPException(status_code=400, detail=f"Недостаточно товара '{product.Name}' на складе")
 
         order_item = OrderItem(
             OrderID=order.OrderID,
             ProductID=product.ProductID,
-            Quantity=item_in.quantity,
-            PriceAtOrder=product.Price
+            Quantity=item["quantity"],
+            PriceAtOrder=product.Price,
+            BatchID=batch_id,
+            ExpirationDate=expiration_date      # <-- теперь всегда определён
         )
         db.add(order_item)
 
-    # Очистка корзины
+    # Очистка личной и общей корзины
     db.query(CartItem).filter(CartItem.UserID == current_user.EmployeeID).delete()
-
-    # Деактивация общей корзины
-    shared = db.query(SharedCart).filter(
-        SharedCart.owner_id == current_user.EmployeeID,
-        SharedCart.is_active == True
-    ).first()
-    if shared:
-        shared.is_active = False
+    if shared_cart:
+        db.query(SharedCartItem).filter(SharedCartItem.shared_cart_id == shared_cart.id).delete()
+        shared_cart.is_active = False
 
     # Бронирование слота самовывоза
     if order_data.delivery_method == 'pickup' and order_data.delivery_date and order_data.delivery_time_slot:
@@ -203,7 +242,6 @@ def cancel_order_by_user(
     if elapsed > timedelta(minutes=5):
         raise HTTPException(status_code=400, detail="Время для отмены истекло (5 минут)")
 
-    # Возврат товаров
     order.Status = 'cancelled'
     for item in order.items:
         return_batch = Batch(
@@ -213,7 +251,6 @@ def cancel_order_by_user(
         )
         db.add(return_batch)
 
-    # Освобождение слота самовывоза
     if order.DeliveryMethod == 'pickup' and order.DeliveryDate and order.DeliveryTimeSlot:
         _release_pickup_slot(db, order.DeliveryDate, order.DeliveryTimeSlot)
 
@@ -221,7 +258,6 @@ def cancel_order_by_user(
     return {"status": "cancelled"}
 
 
-# Админский роутер
 router_admin = APIRouter(prefix="/admin/orders", tags=["Admin Orders"])
 
 def require_manager(current_user: User = Depends(get_current_user)):
@@ -251,7 +287,6 @@ def update_order_status(
     order.Status = status_update.status
     order.ProcessedBy = manager.EmployeeID
 
-    # При отмене/отклонении возвращаем товары и освобождаем слот
     if status_update.status in ('rejected', 'cancelled') and old_status not in ('rejected', 'cancelled'):
         for item in order.items:
             return_batch = Batch(

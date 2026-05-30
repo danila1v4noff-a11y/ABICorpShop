@@ -2,7 +2,7 @@ import uuid
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
-from sqlalchemy import func as sqlfunc
+from sqlalchemy import func
 from app.core.database import get_db
 from app.models.user import User
 from app.models.product import Product
@@ -19,7 +19,6 @@ from app.api.v1.endpoints.auth import get_current_user
 router = APIRouter(prefix="/shared-cart", tags=["Shared Cart"])
 
 def enrich_item(item, db):
-    """Добавляет скидку для товара, если есть истекающая партия."""
     product = item.product
     price = float(product.Price)
     threshold = date.today() + timedelta(days=14)
@@ -100,6 +99,25 @@ def add_item_to_shared_cart(
     if not product:
         raise HTTPException(status_code=404, detail="Товар не найден")
 
+    # Проверка партии (если указана)
+    if item_in.batch_id:
+        batch = db.query(Batch).filter(Batch.BatchID == item_in.batch_id).first()
+        if not batch:
+            raise HTTPException(status_code=404, detail="Партия не найдена")
+        if batch.ProductID != item_in.product_id:
+            raise HTTPException(status_code=400, detail="Партия не принадлежит товару")
+        if batch.Quantity < item_in.quantity:
+            raise HTTPException(status_code=400, detail="Недостаточно товара в выбранной партии")
+
+    # Проверка общего лимита (15 шт. на товар)
+    total_in_cart = db.query(func.sum(SharedCartItem.quantity)).filter(
+        SharedCartItem.shared_cart_id == cart.id,
+        SharedCartItem.product_id == item_in.product_id
+    ).scalar() or 0
+
+    if total_in_cart + item_in.quantity > 15:
+        raise HTTPException(status_code=400, detail="Общее количество товара в общей корзине не может превышать 15 шт.")
+
     existing_item = db.query(SharedCartItem).filter(
         SharedCartItem.shared_cart_id == cart.id,
         SharedCartItem.product_id == item_in.product_id,
@@ -113,6 +131,7 @@ def add_item_to_shared_cart(
     item = SharedCartItem(
         shared_cart_id=cart.id,
         product_id=item_in.product_id,
+         batch_id=item_in.batch_id,          # <-- сохраняем
         quantity=item_in.quantity,
         added_by_user_id=current_user.EmployeeID,
     )
@@ -144,6 +163,9 @@ def update_item_in_shared_cart(
 
     if cart.owner_id != current_user.EmployeeID and item.added_by_user_id != current_user.EmployeeID:
         raise HTTPException(status_code=403, detail="Нет прав для изменения")
+
+    if update.quantity > 15:
+        raise HTTPException(status_code=400, detail="Количество не может превышать 15 шт.")
 
     if update.quantity <= 0:
         db.delete(item)

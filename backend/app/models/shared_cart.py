@@ -8,7 +8,7 @@ class SharedCart(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     owner_id = Column(Integer, ForeignKey("users.EmployeeID"), nullable=False)
-    token = Column(String(36), unique=True, nullable=False, index=True)  # UUID4
+    token = Column(String(36), unique=True, nullable=False, index=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -21,6 +21,7 @@ class SharedCartItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     shared_cart_id = Column(Integer, ForeignKey("SharedCart.id", ondelete="CASCADE"), nullable=False)
     product_id = Column(Integer, ForeignKey("Products.ProductID", ondelete="CASCADE"), nullable=False)
+    batch_id = Column("BatchID", Integer, ForeignKey("Batches.BatchID", ondelete="SET NULL"), nullable=True)
     quantity = Column(Integer, nullable=False, default=1)
     added_by_user_id = Column(Integer, ForeignKey("users.EmployeeID"), nullable=False)
     added_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -29,4 +30,5 @@ class SharedCartItem(Base):
 
     shared_cart = relationship("SharedCart", back_populates="items")
     product = relationship("Product")
-    added_by_user = relationship("User")
+    added_by_user = relationship("User", foreign_keys=[added_by_user_id])
+    batch = relationship("Batch", back_populates="shared_cart_items")

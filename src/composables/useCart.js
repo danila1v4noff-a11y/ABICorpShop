@@ -41,19 +41,18 @@ const fetchCart = async () => {
 }
 
 // Добавить товар в корзину (или увеличить количество)
-const addToCart = async (productId, quantity = 1) => {
+const addToCart = async (productId, batchId, quantity = 1) => {
   const token = getToken()
   if (!token) throw new Error('Не авторизован')
-
   loading.value = true
   error.value = null
   try {
     await axios.post(
       `${API_BASE}/cart/add`,
-      { product_id: productId, quantity },
+      { product_id: productId, batch_id: batchId, quantity },
       { headers: { Authorization: `Bearer ${token}` } },
     )
-    await fetchCart() // обновляем состояние после добавления
+    await fetchCart()
   } catch (err) {
     error.value = err.response?.data?.detail || 'Ошибка добавления в корзину'
     throw err

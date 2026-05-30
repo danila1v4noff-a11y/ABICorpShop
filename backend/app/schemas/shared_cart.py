@@ -6,8 +6,8 @@ class SharedCartItemResponse(BaseModel):
     id: int
     product_id: int
     product_name: str
-    price: float                    # исходная цена
-    discount_price: Optional[float] = None  # цена со скидкой (если есть)
+    price: float
+    discount_price: Optional[float] = None
     quantity: int
     added_by_user_name: str
     added_by_user_id: int
@@ -27,6 +27,7 @@ class SharedCartResponse(BaseModel):
 
 class AddItemToSharedCart(BaseModel):
     product_id: int
+    batch_id: Optional[int] = None
     quantity: int = 1
 
 class UpdateItemQuantity(BaseModel):

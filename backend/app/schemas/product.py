@@ -25,3 +25,19 @@ class RelatedProduct(BaseModel):
     product_id: int
     name: str
     image_url: str | None = None
+
+class BatchResponse(BaseModel):
+    batch_id: int
+    product_id: int
+    product_name: str
+    price: float
+    weight: int | None = None
+    image_url: str | None = None
+    quantity: int
+    expiration_date: date | None = None
+    has_expiring: bool = False
+    category_id: int | None = None
+    category_name: str | None = None
+
+    class Config:
+        from_attributes = True

@@ -25,10 +25,35 @@ const onApplyFilters = (categoryNames) => {
 <template>
   <div class="flex flex-col min-h-screen">
     <Header @toggle-drawer="toggleDrawer" @update:search-query="onSearchUpdate" />
-    <div class="flex-1">
+    <div class="flex-1 relative">
+      <!-- Коллажи с плавным появлением -->
+      <transition name="fade" appear>
+        <img
+          src="/ICONSBACK.svg"
+          alt=""
+          class="absolute bottom-0 left-0 w-80 h-auto opacity-80 pointer-events-none"
+        />
+      </transition>
+      <transition name="fade" appear>
+        <img
+          src="/ICONSBACK.svg"
+          alt=""
+          class="absolute bottom-0 right-0 w-80 h-auto opacity-80 pointer-events-none scale-x-[-1]"
+        />
+      </transition>
+      <!-- Карточки товаров (поверх коллажей) -->
       <CardList :search-query="searchQuery" :category-names="selectedCategoryNames" />
     </div>
     <Footer />
     <Drawer :isOpen="isDrawerOpen" @close="isDrawerOpen = false" @apply-filters="onApplyFilters" />
   </div>
 </template>
+
+<style scoped>
+.fade-enter-active {
+  transition: opacity 1s ease;
+}
+.fade-enter-from {
+  opacity: 0;
+}
+</style>

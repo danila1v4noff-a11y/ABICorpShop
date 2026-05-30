@@ -1,6 +1,5 @@
 <template>
   <div class="min-h-screen bg-gray-100 p-8 relative">
-    <!-- Логотип -->
     <img
       src="/Logo.svg"
       alt="Логотип"
@@ -9,7 +8,6 @@
     />
 
     <div v-if="product" class="max-w-6xl mx-auto">
-      <!-- Кнопка назад -->
       <transition name="fade" appear>
         <div class="mb-4">
           <img
@@ -22,7 +20,6 @@
       </transition>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <!-- Левая часть: фото и кнопки -->
         <transition name="slide-up" appear>
           <div class="flex flex-col items-center">
             <img
@@ -65,7 +62,6 @@
           </div>
         </transition>
 
-        <!-- Правая часть: информация -->
         <transition name="slide-up" appear>
           <div class="flex flex-col justify-center">
             <h1 class="text-5xl font-extrabold text-gray-800 mb-6">{{ product.name }}</h1>
@@ -82,7 +78,6 @@
                 <span class="font-semibold text-xl w-24">Вес:</span>
                 <span class="text-xl">{{ product.weight }} гр.</span>
               </div>
-              <!-- НОВАЯ СТРОКА: цена за кг -->
               <div class="flex gap-4 items-baseline">
                 <span class="font-semibold text-xl w-24">Цена за кг:</span>
                 <span class="text-xl">{{ pricePerKg }} руб.</span>
@@ -99,7 +94,6 @@
               </div>
             </div>
 
-            <!-- Оценки -->
             <div class="grid grid-cols-2 gap-8 mb-8">
               <div>
                 <p class="text-base text-gray-500 mb-2">Общая оценка</p>
@@ -135,7 +129,6 @@
         </transition>
       </div>
 
-      <!-- Похожие товары -->
       <transition name="slide-up" appear>
         <div v-if="relatedProducts.length" class="mt-12">
           <h3 class="text-2xl font-semibold mb-6">Похожие товары</h3>
@@ -177,7 +170,6 @@ const userRating = ref(0)
 const { cartItems, fetchCart, addToCart, updateCartItem, removeFromCart } = useCart()
 const { favorites, fetchFavorites, addFavorite, removeFavorite } = useFavorites()
 
-// Вычисляемое свойство для нового URL картинки продукта
 const productImage = computed(() => {
   if (!product.value?.image_url) return ''
   const url = product.value.image_url
@@ -188,7 +180,6 @@ const productImage = computed(() => {
   return `${base}_1${ext}`
 })
 
-// НОВОЕ: цена за кг
 const pricePerKg = computed(() => {
   if (!product.value?.weight || product.value.weight === 0) return 0
   return Math.round((product.value.price / (product.value.weight / 1000)) * 100) / 100
@@ -216,13 +207,21 @@ const loadProduct = async () => {
   }
 }
 
+// Получает реальное количество товара в корзине, суммируя по всем партиям этого продукта
+const getCurrentCartQuantity = () => {
+  if (!product.value) return 0
+  return cartItems.value
+    .filter((item) => item.product_id === product.value.product_id)
+    .reduce((sum, item) => sum + item.quantity, 0)
+}
+
 const updateLocalState = () => {
   if (!product.value) return
-  const item = cartItems.value.find((i) => i.product_id === product.value.product_id)
-  cartQuantity.value = item ? item.quantity : 0
+  cartQuantity.value = getCurrentCartQuantity()
   isFavorite.value = favorites.value.some((fav) => fav.product_id === product.value.product_id)
 }
 
+// Для добавления выбираем первую доступную партию (любую, т.к. на странице товара нет выбора партии)
 const handleIncrement = async () => {
   if (cartQuantity.value >= 15) return
   const token = localStorage.getItem('access_token')
@@ -230,36 +229,64 @@ const handleIncrement = async () => {
     alert('Необходимо авторизоваться')
     return
   }
+
+  // Ищем первую партию с остатком
+  let batchId = null
   try {
-    if (cartQuantity.value > 0) {
-      const item = cartItems.value.find((i) => i.product_id === product.value.product_id)
-      if (item) await updateCartItem(item.cart_item_id, item.quantity + 1)
+    const resp = await axios.get(`http://127.0.0.1:8000/api/v1/products/${productId.value}`)
+    const productData = resp.data
+    // Получаем все партии товара
+    const batchesResp = await axios.get(`http://127.0.0.1:8000/api/v1/products/`)
+    const allBatches = batchesResp.data
+    const productBatches = allBatches.filter(
+      (b) => b.product_id === productId.value && b.quantity > 0,
+    )
+    if (productBatches.length > 0) {
+      batchId = productBatches[0].batch_id
     } else {
-      await addToCart(product.value.product_id, 1)
+      alert('Товара нет в наличии')
+      return
+    }
+  } catch (e) {
+    alert('Ошибка получения данных о партии')
+    return
+  }
+
+  try {
+    // Находим элемент корзины с таким же batch_id
+    const existingItem = cartItems.value.find((i) => i.batch_id === batchId)
+    if (existingItem) {
+      await updateCartItem(existingItem.cart_item_id, existingItem.quantity + 1)
+    } else {
+      await addToCart(product.value.product_id, batchId, 1)
     }
     await fetchCart()
     updateLocalState()
-  } catch {
-    alert('Ошибка')
+  } catch (e) {
+    alert(e?.response?.data?.detail || 'Ошибка')
   }
 }
 
 const handleDecrement = async () => {
   const token = localStorage.getItem('access_token')
   if (!token) return
+
+  // Находим любой элемент корзины для этого товара
+  const existingItem = cartItems.value.find(
+    (i) => i.product_id === product.value.product_id && i.quantity > 0,
+  )
+  if (!existingItem) return
+
   try {
-    const item = cartItems.value.find((i) => i.product_id === product.value.product_id)
-    if (item) {
-      if (item.quantity > 1) {
-        await updateCartItem(item.cart_item_id, item.quantity - 1)
-      } else {
-        await removeFromCart(item.cart_item_id)
-      }
+    if (existingItem.quantity > 1) {
+      await updateCartItem(existingItem.cart_item_id, existingItem.quantity - 1)
+    } else {
+      await removeFromCart(existingItem.cart_item_id)
     }
     await fetchCart()
     updateLocalState()
-  } catch {
-    alert('Ошибка')
+  } catch (e) {
+    alert(e?.response?.data?.detail || 'Ошибка')
   }
 }
 
@@ -315,7 +342,6 @@ watch(
 </script>
 
 <style scoped>
-/* Анимация прозрачности */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.4s ease;
@@ -325,7 +351,6 @@ watch(
   opacity: 0;
 }
 
-/* Анимация выезда снизу */
 .slide-up-enter-active {
   transition: all 0.5s ease-out;
 }

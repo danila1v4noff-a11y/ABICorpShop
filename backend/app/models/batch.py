@@ -11,5 +11,7 @@ class Batch(Base):
     Quantity = Column(Integer, nullable=False)
     ExpirationDate = Column(Date, nullable=False)
     CreatedAt = Column(DateTime(timezone=True), server_default=func.now())
-
+    cart_items = relationship("CartItem", back_populates="batch")
     product = relationship("Product", back_populates="batches")
+    shared_cart_items = relationship("SharedCartItem", back_populates="batch")
+    order_items = relationship("OrderItem", back_populates="batch")

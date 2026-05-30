@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import axios from 'axios'
 import Card from './Card.vue'
 import { useCart } from '../composables/useCart'
@@ -17,6 +17,8 @@ const loading = ref(false)
 const { cartItems, fetchCart, addToCart, updateCartItem, removeFromCart } = useCart()
 const { favorites, fetchFavorites, addFavorite, removeFavorite } = useFavorites()
 
+const localCart = reactive({})
+
 const loadProducts = async () => {
   loading.value = true
   try {
@@ -29,11 +31,8 @@ const loadProducts = async () => {
     }
     const queryString = queryParts.length ? `?${queryParts.join('&')}` : ''
     const response = await axios.get(`${API_BASE}/products/${queryString}`)
-    products.value = response.data.sort((a, b) => {
-      if (a.has_expiring && !b.has_expiring) return -1
-      if (!a.has_expiring && b.has_expiring) return 1
-      return a.name.localeCompare(b.name, 'ru')
-    })
+    products.value = response.data
+    restoreLocalCart()
   } catch (err) {
     console.error('Ошибка загрузки товаров:', err)
   } finally {
@@ -41,50 +40,61 @@ const loadProducts = async () => {
   }
 }
 
-const isProductInCart = (productId) => cartItems.value.some((item) => item.product_id === productId)
-const isProductInFavorites = (productId) =>
-  favorites.value.some((fav) => fav.product_id === productId)
-const getCartQuantity = (productId) => {
-  const item = cartItems.value.find((i) => i.product_id === productId)
-  return item ? item.quantity : 0
+const restoreLocalCart = () => {
+  for (const item of cartItems.value) {
+    if (item.batch_id) {
+      localCart[item.batch_id] = item.quantity
+    }
+  }
 }
 
-const handleAddToCart = async (productId) => {
+const isProductInFavorites = (productId) =>
+  favorites.value.some((fav) => fav.product_id === productId)
+
+const handleAddToCart = async (productId, batchId, batchQuantity) => {
   const token = localStorage.getItem('access_token')
   if (!token) {
     alert('Для добавления в корзину необходимо авторизоваться')
     return
   }
+  const currentQty = localCart[batchId] || 0
+  if (currentQty >= 15 || currentQty >= batchQuantity) return
+
   try {
-    const item = cartItems.value.find((i) => i.product_id === productId)
+    const item = cartItems.value.find((i) => i.batch_id === batchId)
     if (item) {
       await updateCartItem(item.cart_item_id, item.quantity + 1)
     } else {
-      await addToCart(productId, 1)
+      await addToCart(productId, batchId, 1)
     }
-  } catch (err) {
-    // Показываем конкретную причину от сервера (например, чёрный список)
-    alert(err.response?.data?.detail || 'Не удалось изменить количество')
+    localCart[batchId] = (localCart[batchId] || 0) + 1
+    await fetchCart()
+  } catch {
+    alert('Не удалось изменить количество')
   }
 }
 
-const handleDecrement = async (productId) => {
+const handleDecrement = async (productId, batchId) => {
   const token = localStorage.getItem('access_token')
   if (!token) {
     alert('Для изменения корзины необходимо авторизоваться')
     return
   }
+  const currentQty = localCart[batchId] || 0
+  if (currentQty <= 0) return
+
   try {
-    const item = cartItems.value.find((i) => i.product_id === productId)
-    if (item) {
-      if (item.quantity > 1) {
-        await updateCartItem(item.cart_item_id, item.quantity - 1)
-      } else {
-        await removeFromCart(item.cart_item_id)
-      }
+    const item = cartItems.value.find((i) => i.batch_id === batchId)
+    if (!item) return
+    if (item.quantity > 1) {
+      await updateCartItem(item.cart_item_id, item.quantity - 1)
+    } else {
+      await removeFromCart(item.cart_item_id)
     }
-  } catch (err) {
-    alert(err.response?.data?.detail || 'Не удалось изменить количество')
+    localCart[batchId] = Math.max(0, currentQty - 1)
+    await fetchCart()
+  } catch {
+    alert('Не удалось изменить количество')
   }
 }
 
@@ -100,10 +110,11 @@ const handleToggleFavorite = async (productId) => {
     } else {
       await addFavorite(productId)
     }
-  } catch (err) {
-    alert(err.response?.data?.detail || 'Не удалось изменить избранное')
+  } catch {
+    alert('Не удалось изменить избранное')
   }
 }
+
 watch(
   () => [props.searchQuery, props.categoryNames],
   () => loadProducts(),
@@ -115,6 +126,9 @@ onMounted(async () => {
   if (token) {
     await fetchCart()
     await fetchFavorites()
+    await loadProducts()
+  } else {
+    await loadProducts()
   }
 })
 </script>
@@ -131,20 +145,23 @@ onMounted(async () => {
       appear
     >
       <Card
-        v-for="product in products"
-        :key="product.product_id"
-        :productId="product.product_id"
-        :title="product.name"
-        :imageUrl="product.image_url"
-        :price="product.price"
-        :wheight="product.weight"
-        :cartQuantity="getCartQuantity(product.product_id)"
-        :isAdded="isProductInCart(product.product_id)"
-        :isFavorite="isProductInFavorites(product.product_id)"
-        :hasExpiring="product.has_expiring"
-        :onClickAdd="() => handleAddToCart(product.product_id)"
-        :onClickDecrement="() => handleDecrement(product.product_id)"
-        :onClickFavorite="() => handleToggleFavorite(product.product_id)"
+        v-for="batch in products"
+        :key="batch.batch_id"
+        :productId="batch.product_id"
+        :batchId="batch.batch_id"
+        :title="batch.product_name"
+        :imageUrl="batch.image_url"
+        :price="batch.price"
+        :wheight="batch.weight"
+        :cartQuantity="localCart[batch.batch_id] || 0"
+        :isAdded="(localCart[batch.batch_id] || 0) > 0"
+        :isFavorite="isProductInFavorites(batch.product_id)"
+        :hasExpiring="batch.has_expiring"
+        :quantity="batch.quantity"
+        :expirationDate="batch.expiration_date"
+        :onClickAdd="() => handleAddToCart(batch.product_id, batch.batch_id, batch.quantity)"
+        :onClickDecrement="() => handleDecrement(batch.product_id, batch.batch_id)"
+        :onClickFavorite="() => handleToggleFavorite(batch.product_id)"
       />
     </transition-group>
   </div>

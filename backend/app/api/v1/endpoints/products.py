@@ -11,46 +11,43 @@ from app.models.batch import Batch
 from app.models.category import Category
 from app.models.user import User
 from app.models.rating import ProductRating
-from app.schemas.product import ProductResponse, ProductDetailResponse, RelatedProduct
+from app.schemas.product import ProductResponse, ProductDetailResponse, RelatedProduct, BatchResponse
 from app.schemas.rating import RatingCreate, RatingResponse
 from app.api.v1.endpoints.auth import get_current_user
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
-@router.get("/", response_model=list[ProductResponse])
+@router.get("/", response_model=list[BatchResponse])
 def get_products(
     search: Optional[str] = Query(None),
     category_names: Optional[List[str]] = Query(None, alias="category_names"),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Product)
+    query = db.query(Batch).join(Product).join(Category, isouter=True)
     if search:
         query = query.filter(Product.Name.ilike(f"%{search}%"))
     if category_names:
-        query = query.join(Product.category).filter(Category.Name.in_(category_names))
-    products = query.all()
+        query = query.filter(Category.Name.in_(category_names))
 
+    batches = query.order_by(Batch.ExpirationDate.asc()).all()
     threshold = date.today() + timedelta(days=14)
 
     result = []
-    for p in products:
-        total_qty = db.query(sqlfunc.coalesce(sqlfunc.sum(Batch.Quantity), 0))\
-                      .filter(Batch.ProductID == p.ProductID).scalar()
-
-        has_exp = db.query(Batch).filter(
-            Batch.ProductID == p.ProductID,
-            Batch.Quantity > 0,
-            Batch.ExpirationDate <= threshold
-        ).first() is not None
-
-        result.append(ProductResponse(
-            product_id=p.ProductID,
-            name=p.Name,
-            price=float(p.Price),
-            weight=p.Weight,
-            image_url=p.ImageURL,
-            stock=total_qty,
-            has_expiring=has_exp
+    for b in batches:
+        product = b.product
+        has_exp = b.ExpirationDate and b.ExpirationDate <= threshold
+        result.append(BatchResponse(
+            batch_id=b.BatchID,
+            product_id=product.ProductID,
+            product_name=product.Name,
+            price=float(product.Price),
+            weight=product.Weight,
+            image_url=product.ImageURL,
+            quantity=b.Quantity,
+            expiration_date=b.ExpirationDate,
+            has_expiring=has_exp,
+            category_id=product.CategoryID,
+            category_name=product.category.Name if product.category else None
         ))
     return result
 
@@ -130,7 +127,6 @@ def get_related_products(product_id: int, db: Session = Depends(get_db)):
     return [RelatedProduct(product_id=p.ProductID, name=p.Name, image_url=p.ImageURL) for p in chosen]
 
 
-# Вспомогательная функция для получения рейтинга
 def get_rating_response(product_id: int, user_id: int, db: Session):
     avg = db.query(sqlfunc.avg(ProductRating.Rating)).filter(
         ProductRating.ProductID == product_id
