@@ -7,19 +7,10 @@ from app.core.security import get_password_hash
 
 # Список логинов, которым нужен пароль (все, кроме ManagerABI и DimitryGurko_ABI)
 logins = [
-    "AnnaSmirnova_ABI",
-    "PetrIvanov_ABI",
-    "ElenaKuznetsova_ABI",
-    "AlexeySokolov_ABI",
-    "OlgaMikhailova_ABI",
-    "ArtemFedorov_ABI",
-    "TatianaMorozova_ABI",
-    "DenisVolkov_ABI",
-    "AnastasiaPavlova_ABI",
-    "MaximStepanov_ABI",
+    "Holden_ABI"
 ]
 
-default_password = "password123"
+default_password = "mail123"
 
 db = SessionLocal()
 for login in logins:

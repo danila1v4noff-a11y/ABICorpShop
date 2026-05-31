@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 # Импорт моделей
 from app.models import user, product, cart, favorite
@@ -15,6 +17,9 @@ from app.api.v1.endpoints.categories import router as categories_router
 from app.api.v1.endpoints.users import router as users_router
 from app.api.v1.endpoints.blacklist import router as blacklist_router
 from app.api.v1.endpoints.pickup import router as pickup_router
+from app.api.v1.endpoints.notifications import router as notifications_router
+
+security = HTTPBearer()
 
 app = FastAPI(
     title="ABICorpShop API",
@@ -43,7 +48,12 @@ app.include_router(categories_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(blacklist_router, prefix="/api/v1")
 app.include_router(pickup_router, prefix="/api/v1")
+app.include_router(notifications_router)
 
 @app.get("/")
 async def root():
     return {"message": "Welcome to ABICorpShop API"}
+
+@app.get("/temp-bearer-check")
+async def temp_bearer_check(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    return {"token": credentials.credentials}
