@@ -20,7 +20,6 @@ class EmployeeOrder(Base):
     CreatedAt = Column(DateTime(timezone=True), server_default=func.now())
     ProcessedBy = Column(Integer, ForeignKey("users.EmployeeID"), nullable=True)
     ManagerComment = Column(String, nullable=True)
-
     user = relationship("User", back_populates="orders", foreign_keys=[UserID])
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
 

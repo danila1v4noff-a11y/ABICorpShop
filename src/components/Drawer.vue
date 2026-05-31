@@ -6,7 +6,11 @@ defineProps({ isOpen: Boolean })
 const emit = defineEmits(['close', 'apply-filters'])
 
 const categories = ref([])
-const selectedCategoryNames = ref([]) // массив названий
+const selectedCategoryNames = ref([])
+
+// новые поля для дат
+const dateFrom = ref('')
+const dateTo = ref('')
 
 onMounted(async () => {
   try {
@@ -27,7 +31,12 @@ const toggleCategory = (categoryName) => {
 }
 
 const applyFilters = () => {
-  emit('apply-filters', [...selectedCategoryNames.value])
+  // передаём объект со всеми активными фильтрами
+  emit('apply-filters', {
+    categories: [...selectedCategoryNames.value],
+    dateFrom: dateFrom.value,
+    dateTo: dateTo.value,
+  })
   emit('close')
 }
 </script>
@@ -47,6 +56,7 @@ const applyFilters = () => {
       <h2 class="text-2xl font-bold text-[#4F0B26]">Фильтры</h2>
     </div>
 
+    <!-- Категории -->
     <div class="space-y-4">
       <label
         v-for="cat in categories"
@@ -62,6 +72,18 @@ const applyFilters = () => {
         />
         <span>{{ cat.name }}</span>
       </label>
+    </div>
+
+    <!-- Фильтр по дате партии -->
+    <div class="mt-6 space-y-4">
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">Срок годности с</label>
+        <input type="date" v-model="dateFrom" class="w-full border rounded p-2" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">Срок годности по</label>
+        <input type="date" v-model="dateTo" class="w-full border rounded p-2" />
+      </div>
     </div>
 
     <div class="mt-8">

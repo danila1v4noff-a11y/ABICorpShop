@@ -8,4 +8,3 @@ class PickupSlot(Base):
     TimeSlot = Column(String(10), nullable=False)
     BookedCount = Column(Integer, nullable=False, default=0)
     MaxCapacity = Column(Integer, nullable=False, default=20)
-    __table_args__ = (UniqueConstraint("PickupDate", "TimeSlot"),)

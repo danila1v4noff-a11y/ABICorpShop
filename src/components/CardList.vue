@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, watch, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted, computed } from 'vue'
 import axios from 'axios'
 import Card from './Card.vue'
 import { useCart } from '../composables/useCart'
@@ -8,6 +8,8 @@ import { useFavorites } from '../composables/useFavorites'
 const props = defineProps({
   searchQuery: { type: String, default: '' },
   categoryNames: { type: Array, default: () => [] },
+  dateFrom: { type: String, default: '' },
+  dateTo: { type: String, default: '' },
 })
 
 const API_BASE = 'http://127.0.0.1:8000/api/v1'
@@ -39,6 +41,31 @@ const loadProducts = async () => {
     loading.value = false
   }
 }
+
+// Вычисляем итоговый список с учётом дат
+const filteredProducts = computed(() => {
+  let result = products.value
+
+  if (props.dateFrom) {
+    const from = new Date(props.dateFrom)
+    from.setHours(0, 0, 0, 0) // начало дня
+    result = result.filter((b) => {
+      const exp = new Date(b.expiration_date)
+      return exp >= from
+    })
+  }
+
+  if (props.dateTo) {
+    const to = new Date(props.dateTo)
+    to.setHours(23, 59, 59, 999) // конец дня
+    result = result.filter((b) => {
+      const exp = new Date(b.expiration_date)
+      return exp <= to
+    })
+  }
+
+  return result
+})
 
 const restoreLocalCart = () => {
   for (const item of cartItems.value) {
@@ -115,6 +142,7 @@ const handleToggleFavorite = async (productId) => {
   }
 }
 
+// Перезагрузка при изменении поиска или категорий (даты не влияют на API)
 watch(
   () => [props.searchQuery, props.categoryNames],
   () => loadProducts(),
@@ -136,7 +164,9 @@ onMounted(async () => {
 <template>
   <div class="p-10">
     <div v-if="loading" class="text-center">Загрузка товаров...</div>
-    <div v-else-if="products.length === 0" class="text-center text-gray-500">Ничего не найдено</div>
+    <div v-else-if="filteredProducts.length === 0" class="text-center text-gray-500">
+      Ничего не найдено
+    </div>
     <transition-group
       v-else
       name="card-list"
@@ -145,7 +175,7 @@ onMounted(async () => {
       appear
     >
       <Card
-        v-for="batch in products"
+        v-for="batch in filteredProducts"
         :key="batch.batch_id"
         :productId="batch.product_id"
         :batchId="batch.batch_id"

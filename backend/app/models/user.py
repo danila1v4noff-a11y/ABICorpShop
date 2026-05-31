@@ -19,7 +19,6 @@ class User(Base):
     orders = relationship("EmployeeOrder", back_populates="user", foreign_keys="[EmployeeOrder.UserID]")
     ratings = relationship("ProductRating", back_populates="user")
     blacklist_entry = relationship("Blacklist", back_populates="user", uselist=False, foreign_keys="[Blacklist.UserID]")
-
     @property
     def is_active(self):
         return self.StatusID == 1

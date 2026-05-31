@@ -16,7 +16,6 @@ from app.api.v1.endpoints.users import router as users_router
 from app.api.v1.endpoints.blacklist import router as blacklist_router
 from app.api.v1.endpoints.pickup import router as pickup_router
 
-
 app = FastAPI(
     title="ABICorpShop API",
     description="Бэкенд для интернет-магазина",

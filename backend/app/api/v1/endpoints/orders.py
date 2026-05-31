@@ -74,9 +74,11 @@ def _release_pickup_slot(db: Session, pickup_date: date, time_slot: str):
 
 @router.post("/", response_model=OrderResponse)
 def create_order(
+    
     order_data: OrderCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
+    
 ):
     # Собираем все позиции из личной корзины
     personal_items = db.query(CartItem).filter(CartItem.UserID == current_user.EmployeeID).all()

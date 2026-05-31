@@ -8,6 +8,8 @@ import Footer from '../components/Footer.vue'
 const isDrawerOpen = ref(false)
 const searchQuery = ref('')
 const selectedCategoryNames = ref([])
+const dateFrom = ref('')
+const dateTo = ref('')
 
 const toggleDrawer = () => {
   isDrawerOpen.value = !isDrawerOpen.value
@@ -17,8 +19,10 @@ const onSearchUpdate = (query) => {
   searchQuery.value = query
 }
 
-const onApplyFilters = (categoryNames) => {
-  selectedCategoryNames.value = [...categoryNames]
+const onApplyFilters = (filters) => {
+  selectedCategoryNames.value = [...filters.categories]
+  dateFrom.value = filters.dateFrom
+  dateTo.value = filters.dateTo
 }
 </script>
 
@@ -41,8 +45,13 @@ const onApplyFilters = (categoryNames) => {
           class="hidden sm:block absolute bottom-0 right-0 w-48 md:w-64 lg:w-80 h-auto opacity-80 pointer-events-none scale-x-[-1]"
         />
       </transition>
-      <!-- Карточки товаров (поверх коллажей) -->
-      <CardList :search-query="searchQuery" :category-names="selectedCategoryNames" />
+      <!-- Карточки товаров -->
+      <CardList
+        :search-query="searchQuery"
+        :category-names="selectedCategoryNames"
+        :date-from="dateFrom"
+        :date-to="dateTo"
+      />
     </div>
     <Footer />
     <Drawer :isOpen="isDrawerOpen" @close="isDrawerOpen = false" @apply-filters="onApplyFilters" />
