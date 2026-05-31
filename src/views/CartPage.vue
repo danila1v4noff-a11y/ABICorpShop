@@ -196,16 +196,6 @@
             <div class="bg-white rounded-lg shadow p-6">
               <h2 class="text-xl font-semibold mb-4">Способ оплаты</h2>
               <div class="space-y-3">
-                <label class="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="payment"
-                    value="sbp"
-                    class="w-5 h-5"
-                    v-model="paymentMethod"
-                  />
-                  <span>СБП</span>
-                </label>
                 <!-- Картой доступно всегда -->
                 <label class="flex items-center gap-3 cursor-pointer">
                   <input
@@ -325,44 +315,6 @@
         </button>
       </div>
     </div>
-
-    <!-- Модальное окно QR-кода (СБП) -->
-    <div
-      v-if="showQrModal && !orderPlaced"
-      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-    >
-      <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full text-center relative">
-        <button
-          @click="showQrModal = false"
-          class="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-        <h2 class="text-xl font-bold mb-4">Оплата по СБП</h2>
-        <p class="mb-4 text-gray-600">Отсканируйте QR-код в приложении банка</p>
-        <img src="/qr-placeholder.svg" alt="QR-код" class="mx-auto w-48 h-48" />
-        <p class="mt-4 text-sm text-gray-500">После оплаты нажмите «Готово»</p>
-        <button
-          @click="completePayment"
-          class="mt-4 w-full bg-[#FFA100] hover:bg-[#e09000] text-white font-bold py-2 rounded transition-colors"
-        >
-          Готово
-        </button>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -383,7 +335,7 @@ const selectedOffice = ref(null)
 const selectedCabinet = ref('')
 
 const deliveryMethod = ref('delivery')
-const paymentMethod = ref('sbp')
+const paymentMethod = ref('card') // По умолчанию – карта
 
 const selectedPickupDate = ref(null)
 const selectedPickupSlot = ref(null)
@@ -439,7 +391,6 @@ const fetchAvailableSlots = async () => {
   }
 }
 
-// Сумма оставшихся мест по всем слотам на дату
 const getDateRemaining = (dateStr) => {
   if (!availableSlots.value.length) return null
   return availableSlots.value
@@ -447,7 +398,6 @@ const getDateRemaining = (dateStr) => {
     .reduce((sum, s) => sum + s.remaining, 0)
 }
 
-// Оставшиеся места в конкретном слоте на выбранную дату
 const getSlotRemaining = (timeSlot) => {
   const selDate = selectedPickupDate.value
   if (!selDate || !availableSlots.value.length) return null
@@ -455,15 +405,13 @@ const getSlotRemaining = (timeSlot) => {
   return slot ? slot.remaining : 0
 }
 
-// Переключение на самовывоз – подгружаем слоты
 watch(deliveryMethod, (newVal) => {
   if (newVal === 'pickup') {
     fetchAvailableSlots()
   }
 })
 
-// === Остальные функции без изменений ===
-
+// === Функции управления модалками ===
 const setPickup = () => {
   deliveryMethod.value = 'pickup'
   selectedOffice.value = null
@@ -500,8 +448,6 @@ const canProceed = computed(() => {
   }
   return false
 })
-
-const showQrModal = ref(false)
 
 const submitOrder = async () => {
   try {
@@ -540,7 +486,6 @@ const submitOrder = async () => {
       sharedToken.value = ''
       sharedCart.value = null
     }
-    // Обновляем слоты после успешного заказа
     if (deliveryMethod.value === 'pickup') {
       fetchAvailableSlots()
     }
@@ -554,21 +499,6 @@ const submitOrder = async () => {
 
 const handleContinue = async () => {
   if (!canProceed.value) return
-  if (paymentMethod.value === 'sbp') {
-    showQrModal.value = true
-  } else {
-    const success = await submitOrder()
-    if (success) {
-      orderPlaced.value = true
-      setTimeout(() => {
-        router.push('/')
-      }, 2000)
-    }
-  }
-}
-
-const completePayment = async () => {
-  showQrModal.value = false
   const success = await submitOrder()
   if (success) {
     orderPlaced.value = true
@@ -591,8 +521,8 @@ const combinedItems = computed(() => {
     cart_item_id: null,
     product_id: item.product_id,
     product_name: item.product_name,
-    price: item.price, // исходная цена
-    discount_price: item.discount_price, // <-- теперь берём из ответа API
+    price: item.price,
+    discount_price: item.discount_price,
     image_url: item.image_url,
     quantity: item.quantity,
     isShared: true,
@@ -621,7 +551,6 @@ const totalWeightCombined = computed(() => totalWeight.value)
 
 const currentUserId = ref(null)
 
-// Исправленная загрузка общей корзины
 const loadSharedCart = async () => {
   if (!sharedToken.value) {
     sharedCart.value = null
@@ -632,19 +561,14 @@ const loadSharedCart = async () => {
       `http://127.0.0.1:8000/api/v1/shared-cart/${sharedToken.value}`,
     )
     const data = response.data
-    console.log('Общая корзина загружена:', data)
-
     if (currentUserId.value && data.owner_id !== currentUserId.value) {
-      console.warn('Токен чужой корзины, сбрасываем')
       localStorage.removeItem('shared_cart_token')
       sharedToken.value = ''
       sharedCart.value = null
       return
     }
-    // Принудительно создаём новый объект для реактивности
     sharedCart.value = { ...data, items: data.items ? [...data.items] : [] }
   } catch (err) {
-    console.error('Ошибка загрузки общей корзины:', err)
     localStorage.removeItem('shared_cart_token')
     sharedToken.value = ''
     sharedCart.value = null
@@ -783,7 +707,6 @@ onMounted(async () => {
     sharedToken.value = savedSharedToken
     await loadSharedCart()
   }
-  // Первоначальная загрузка слотов
   fetchAvailableSlots()
 })
 </script>
