@@ -42,17 +42,13 @@ const logout = () => {
 const goToProfile = () => router.push('/profile')
 const goToCart = () => router.push('/cart')
 
-// Поиск
 const searchQuery = ref('')
 let debounceTimer = null
 const emitSearch = () => {
   clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => {
-    emit('update:searchQuery', searchQuery.value)
-  }, 1000)
+  debounceTimer = setTimeout(() => emit('update:searchQuery', searchQuery.value), 1000)
 }
 
-// Загрузка количества pending заказов для менеджера
 const fetchPendingCount = async () => {
   if (!isManager.value) return
   try {
@@ -74,58 +70,67 @@ onMounted(() => {
 </script>
 
 <template>
-  <header class="bg-[#FF4E4E] px-12 pb-4">
-    <div class="flex justify-between items-center">
+  <header class="bg-[#FF4E4E] px-4 md:px-8 lg:px-12 pb-4">
+    <div class="flex justify-between items-center flex-wrap gap-3">
       <div>
-        <img src="/Logo.svg" alt="Logo" class="w-40" />
+        <img src="/Logo.svg" alt="Logo" class="w-28 md:w-36 lg:w-40" />
       </div>
-      <div class="flex items-center gap-3">
-        <!-- Корзина -->
-        <div class="relative mr-5 cursor-pointer" @click="goToCart">
-          <img src="/Order.png" alt="Order" class="w-10" />
+      <div class="flex items-center gap-1 md:gap-3 flex-wrap">
+        <div class="relative cursor-pointer" @click="goToCart">
+          <img src="/Order.png" alt="Order" class="w-8 md:w-10" />
           <span
             v-if="cartCount > 0"
-            class="absolute -top-1 -right-1 bg-white text-[#FF4E4E] text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"
+            class="absolute -top-1 -right-1 bg-white text-[#FF4E4E] text-xs font-bold rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center"
             >{{ cartCount }}</span
           >
         </div>
 
-        <!-- Колокольчик для менеджера (меняется иконка) -->
-        <router-link v-if="isManager" to="/admin/orders" class="relative mr-3 cursor-pointer">
+        <router-link v-if="isManager" to="/admin/orders" class="relative cursor-pointer">
           <img
             :src="pendingCount > 0 ? '/Bell_on.svg' : '/Bell_off.svg'"
             alt="Уведомления"
-            class="w-10"
+            class="w-8 md:w-10"
           />
           <span
             v-if="pendingCount > 0"
-            class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"
+            class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center"
             >{{ pendingCount }}</span
           >
         </router-link>
-        <router-link to="/rules" class="relative mr-3 cursor-pointer">
-          <img src="/Rule.svg" alt="Правила" class="w-10" />
-        </router-link>
-        <!-- Авторизация -->
-        <div v-if="user" class="flex items-center gap-3">
-          <span class="text-white font-medium">{{ user.fio }}</span>
-          <button @click="logout" class="text-sm text-white/80 hover:text-white">Выйти</button>
-        </div>
-        <router-link v-else to="/login" class="text-white hover:underline">Войти</router-link>
 
-        <!-- Профиль и адрес -->
-        <div class="relative flex items-center gap-2">
-          <img src="/Employee.svg" alt="Profile" class="w-10 cursor-pointer" @click="goToProfile" />
+        <router-link to="/rules" class="relative cursor-pointer">
+          <img src="/Rule.svg" alt="Правила" class="w-8 md:w-10" />
+        </router-link>
+
+        <div v-if="user" class="flex items-center gap-1 md:gap-3 text-sm">
+          <span class="text-white font-medium truncate max-w-[120px] md:max-w-none">{{
+            user.fio
+          }}</span>
+          <button @click="logout" class="text-xs md:text-sm text-white/80 hover:text-white">
+            Выйти
+          </button>
+        </div>
+        <router-link v-else to="/login" class="text-white text-sm hover:underline"
+          >Войти</router-link
+        >
+
+        <div class="relative flex items-center gap-1 md:gap-2">
+          <img
+            src="/Employee.svg"
+            alt="Profile"
+            class="w-8 md:w-10 cursor-pointer"
+            @click="goToProfile"
+          />
           <b
-            class="font-medium text-white transition-colors duration-200 cursor-pointer hover:text-gray-300"
+            class="font-medium text-xs md:text-sm text-white transition-colors duration-200 cursor-pointer hover:text-gray-300 truncate max-w-[100px] md:max-w-none"
             @click="toggleDropdown"
             >{{ selectedAddress }}</b
           >
           <div
             v-if="isDropdownOpen"
-            class="absolute left-0 top-full mt-2 w-56 bg-white rounded-lg shadow-lg z-10"
+            class="absolute left-0 top-full mt-2 w-48 md:w-56 bg-white rounded-lg shadow-lg z-10"
           >
-            <ul class="py-1">
+            <ul class="py-1 text-sm">
               <li
                 v-for="address in addresses"
                 :key="address"
@@ -142,26 +147,26 @@ onMounted(() => {
     </div>
 
     <div class="flex justify-center mt-4">
-      <div class="flex items-center gap-4">
-        <div class="relative w-96 flex-shrink-0">
+      <div class="flex items-center gap-2 md:gap-4 w-full max-w-sm md:max-w-md lg:max-w-lg">
+        <div class="relative flex-1">
           <img
             src="/Glass.svg"
             alt="Search"
-            class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 pointer-events-none"
+            class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 pointer-events-none"
           />
           <input
             v-model="searchQuery"
             type="text"
             placeholder="Поиск..."
             @input="emitSearch"
-            class="w-full py-2 pl-12 pr-4 bg-white border border-gray-400 rounded-full focus:outline-none focus:ring-1 focus:ring-gray-400"
+            class="w-full py-2 pl-10 pr-4 bg-white border border-gray-400 rounded-full focus:outline-none focus:ring-1 focus:ring-gray-400 text-sm"
           />
         </div>
         <button
           @click="emit('toggleDrawer')"
           class="transition-transform duration-100 active:scale-95"
         >
-          <img src="/Filters.svg" alt="Filter" class="w-6 h-6" />
+          <img src="/Filters.svg" alt="Filter" class="w-5 h-5 md:w-6 md:h-6" />
         </button>
       </div>
     </div>

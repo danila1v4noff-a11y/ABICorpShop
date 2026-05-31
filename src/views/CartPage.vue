@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-100 p-8">
+  <div class="min-h-screen bg-gray-100 p-4 md:p-8">
     <!-- Основной контент корзины (показывается до оформления заказа) -->
     <div v-if="!orderPlaced">
       <!-- Стрелка назад -->
@@ -13,8 +13,8 @@
       </div>
 
       <div class="max-w-6xl mx-auto">
-        <div class="bg-white rounded-lg shadow p-6 mb-6">
-          <h1 class="text-3xl font-bold">Корзина</h1>
+        <div class="bg-white rounded-lg shadow p-4 md:p-6 mb-6">
+          <h1 class="text-2xl md:text-3xl font-bold">Корзина</h1>
         </div>
 
         <div
@@ -24,21 +24,25 @@
           Корзина пуста
         </div>
 
-        <div v-else class="grid grid-cols-2 gap-6 items-stretch">
+        <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
           <!-- Левая колонка: товары -->
-          <div class="bg-white rounded-lg shadow p-6">
+          <div class="bg-white rounded-lg shadow p-4 md:p-6">
             <h2 class="text-xl font-semibold mb-4">Товары</h2>
             <div class="space-y-4">
               <div
                 v-for="item in combinedItems"
                 :key="item.isShared ? `s_${item.shared_item_id}` : `p_${item.cart_item_id}`"
-                class="flex items-center gap-4 border-b pb-4"
+                class="flex flex-wrap items-center gap-4 border-b pb-4"
               >
-                <img :src="item.image_url" alt="product" class="w-16 h-16 object-contain rounded" />
-                <div class="flex-1">
-                  <p class="font-semibold">{{ item.product_name }}</p>
+                <img
+                  :src="item.image_url"
+                  alt="product"
+                  class="w-12 h-12 md:w-16 md:h-16 object-contain rounded"
+                />
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-sm md:text-base">{{ item.product_name }}</p>
                   <!-- Цена с учётом скидки -->
-                  <p class="text-gray-600">
+                  <p class="text-gray-600 text-sm md:text-base">
                     <template v-if="item.discount_price">
                       <span class="line-through text-red-400 mr-2">{{ item.price }} руб.</span>
                       <span class="font-semibold text-gray-800"
@@ -54,25 +58,28 @@
                     Добавил: {{ item.added_by_user_name }}
                   </p>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 ml-auto">
                   <!-- ПЛЮС (скрыт, если >= 15) -->
                   <button
                     v-if="item.quantity < 15"
                     @click="increaseQuantity(item)"
                     class="w-8 h-8 rounded border hover:bg-gray-100 flex items-center justify-center"
                   >
-                    <img src="/Plus_Main.svg" alt="+" class="w-4 h-4" />
+                    <img src="/Plus_Main.svg" alt="+" class="w-3 h-3 md:w-4 md:h-4" />
                   </button>
-                  <span class="w-8 text-center">{{ item.quantity }}</span>
+                  <span class="w-6 md:w-8 text-center">{{ item.quantity }}</span>
                   <!-- МИНУС (всегда) -->
                   <button
                     @click="decreaseQuantity(item)"
                     class="w-8 h-8 rounded border hover:bg-gray-100 flex items-center justify-center"
                   >
-                    <img src="/Minus_Main.svg" alt="-" class="w-4 h-4" />
+                    <img src="/Minus_Main.svg" alt="-" class="w-3 h-3 md:w-4 md:h-4" />
                   </button>
                 </div>
-                <button @click="removeItem(item)" class="text-red-500 hover:text-red-700 ml-2">
+                <button
+                  @click="removeItem(item)"
+                  class="text-red-500 hover:text-red-700 text-sm md:text-base ml-2 whitespace-nowrap"
+                >
                   Удалить
                 </button>
               </div>
@@ -81,13 +88,13 @@
 
           <!-- Правая колонка -->
           <div class="flex flex-col gap-6">
-            <div class="bg-white rounded-lg shadow p-6">
+            <div class="bg-white rounded-lg shadow p-4 md:p-6">
               <div class="space-y-4">
-                <div class="flex justify-between text-lg">
+                <div class="flex justify-between text-base md:text-lg">
                   <span>Сумма заказа</span>
                   <span class="font-bold">{{ totalSumCombined }} руб.</span>
                 </div>
-                <div class="flex justify-between text-lg">
+                <div class="flex justify-between text-base md:text-lg">
                   <span>Масса нетто заказа</span>
                   <span class="font-bold">{{ totalWeightCombined }} г.</span>
                 </div>
@@ -136,7 +143,7 @@
                       :key="d.value"
                       @click="selectedPickupDate = d.value"
                       :disabled="getDateRemaining(d.value) === 0"
-                      class="text-sm border rounded px-2 py-1 transition"
+                      class="text-xs md:text-sm border rounded px-2 py-1 transition"
                       :class="{
                         'bg-[#FFA100] text-white border-[#FFA100]': selectedPickupDate === d.value,
                         'border-gray-300 hover:border-[#FFA100]':
@@ -156,7 +163,7 @@
                       :key="slot.value"
                       @click="selectedPickupSlot = slot"
                       :disabled="!selectedPickupDate || getSlotRemaining(slot.value) === 0"
-                      class="text-sm border rounded px-2 py-1 transition"
+                      class="text-xs md:text-sm border rounded px-2 py-1 transition"
                       :class="{
                         'bg-[#FFA100] text-white border-[#FFA100]':
                           selectedPickupSlot?.value === slot.value,
@@ -181,19 +188,25 @@
 
             <!-- Блок "Поделиться корзиной" -->
             <div
-              class="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition"
+              class="bg-white rounded-lg shadow p-4 md:p-6 cursor-pointer hover:shadow-md transition"
               @click="shareCart"
             >
               <div class="flex items-center gap-4">
-                <img src="/Plus.svg" alt="Поделиться" class="w-24 h-24 flex-shrink-0" />
+                <img
+                  src="/Plus.svg"
+                  alt="Поделиться"
+                  class="w-16 h-16 md:w-24 md:h-24 flex-shrink-0"
+                />
                 <div>
-                  <p class="font-semibold">Поделитесь корзиной с коллегами</p>
-                  <p class="text-gray-600">чтобы они могли добавлять в корзину свои продукты</p>
+                  <p class="font-semibold text-sm md:text-base">Поделитесь корзиной с коллегами</p>
+                  <p class="text-gray-600 text-xs md:text-sm">
+                    чтобы они могли добавлять в корзину свои продукты
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div class="bg-white rounded-lg shadow p-6">
+            <div class="bg-white rounded-lg shadow p-4 md:p-6">
               <h2 class="text-xl font-semibold mb-4">Способ оплаты</h2>
               <div class="space-y-3">
                 <!-- Картой доступно всегда -->
@@ -391,6 +404,7 @@ const fetchAvailableSlots = async () => {
   }
 }
 
+// Сумма оставшихся мест по всем слотам на дату
 const getDateRemaining = (dateStr) => {
   if (!availableSlots.value.length) return null
   return availableSlots.value
@@ -398,6 +412,7 @@ const getDateRemaining = (dateStr) => {
     .reduce((sum, s) => sum + s.remaining, 0)
 }
 
+// Оставшиеся места в конкретном слоте на выбранную дату
 const getSlotRemaining = (timeSlot) => {
   const selDate = selectedPickupDate.value
   if (!selDate || !availableSlots.value.length) return null
@@ -405,13 +420,13 @@ const getSlotRemaining = (timeSlot) => {
   return slot ? slot.remaining : 0
 }
 
+// Переключение на самовывоз – подгружаем слоты
 watch(deliveryMethod, (newVal) => {
   if (newVal === 'pickup') {
     fetchAvailableSlots()
   }
 })
 
-// === Функции управления модалками ===
 const setPickup = () => {
   deliveryMethod.value = 'pickup'
   selectedOffice.value = null
@@ -486,6 +501,7 @@ const submitOrder = async () => {
       sharedToken.value = ''
       sharedCart.value = null
     }
+    // Обновляем слоты после успешного заказа
     if (deliveryMethod.value === 'pickup') {
       fetchAvailableSlots()
     }
@@ -508,7 +524,7 @@ const handleContinue = async () => {
   }
 }
 
-// ====== Логика общей корзины (ИСПРАВЛЕНО) ======
+// ====== Логика общей корзины ======
 const combinedItems = computed(() => {
   const personal = cartItems.value.map((item) => ({
     ...item,
@@ -521,8 +537,8 @@ const combinedItems = computed(() => {
     cart_item_id: null,
     product_id: item.product_id,
     product_name: item.product_name,
-    price: item.price,
-    discount_price: item.discount_price,
+    price: item.price, // исходная цена
+    discount_price: item.discount_price, // <-- теперь берём из ответа API
     image_url: item.image_url,
     quantity: item.quantity,
     isShared: true,
@@ -551,6 +567,7 @@ const totalWeightCombined = computed(() => totalWeight.value)
 
 const currentUserId = ref(null)
 
+// Исправленная загрузка общей корзины
 const loadSharedCart = async () => {
   if (!sharedToken.value) {
     sharedCart.value = null
@@ -567,6 +584,7 @@ const loadSharedCart = async () => {
       sharedCart.value = null
       return
     }
+    // Принудительно создаём новый объект для реактивности
     sharedCart.value = { ...data, items: data.items ? [...data.items] : [] }
   } catch (err) {
     localStorage.removeItem('shared_cart_token')
@@ -707,6 +725,7 @@ onMounted(async () => {
     sharedToken.value = savedSharedToken
     await loadSharedCart()
   }
+  // Первоначальная загрузка слотов
   fetchAvailableSlots()
 })
 </script>

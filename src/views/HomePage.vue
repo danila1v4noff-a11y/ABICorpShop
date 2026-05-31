@@ -26,19 +26,19 @@ const onApplyFilters = (categoryNames) => {
   <div class="flex flex-col min-h-screen">
     <Header @toggle-drawer="toggleDrawer" @update:search-query="onSearchUpdate" />
     <div class="flex-1 relative">
-      <!-- Коллажи с плавным появлением -->
+      <!-- Коллажи (скрыты на мобильных) -->
       <transition name="fade" appear>
         <img
           src="/ICONSBACK.svg"
           alt=""
-          class="absolute bottom-0 left-0 w-80 h-auto opacity-80 pointer-events-none"
+          class="hidden sm:block absolute bottom-0 left-0 w-48 md:w-64 lg:w-80 h-auto opacity-80 pointer-events-none"
         />
       </transition>
       <transition name="fade" appear>
         <img
           src="/ICONSBACK.svg"
           alt=""
-          class="absolute bottom-0 right-0 w-80 h-auto opacity-80 pointer-events-none scale-x-[-1]"
+          class="hidden sm:block absolute bottom-0 right-0 w-48 md:w-64 lg:w-80 h-auto opacity-80 pointer-events-none scale-x-[-1]"
         />
       </transition>
       <!-- Карточки товаров (поверх коллажей) -->

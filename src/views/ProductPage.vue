@@ -1,12 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-100 p-8 relative">
-    <img
-      src="/Logo.svg"
-      alt="Логотип"
-      class="absolute top-0 left-4 h-12 w-auto mt-4 cursor-pointer"
-      @click="$router.push('/')"
-    />
-
+  <div class="min-h-screen bg-gray-100 p-4 md:p-8 relative">
     <div v-if="product" class="max-w-6xl mx-auto">
       <transition name="fade" appear>
         <div class="mb-4">
@@ -25,35 +18,35 @@
             <img
               :src="productImage"
               :alt="product.name"
-              class="w-full max-w-md h-80 object-contain mb-6"
+              class="w-full max-w-sm md:max-w-md h-60 md:h-80 object-contain mb-6"
             />
-            <div class="flex gap-6 mt-4">
+            <div class="flex gap-4 md:gap-6 mt-4">
               <div class="flex items-center gap-4">
                 <div v-if="cartQuantity > 0" class="flex items-center gap-4">
                   <img
                     @click="handleDecrement"
                     src="/Minus_Main.svg"
-                    class="w-10 h-10 cursor-pointer transition active:scale-90"
+                    class="w-8 h-8 md:w-10 md:h-10 cursor-pointer transition active:scale-90"
                   />
-                  <span class="text-2xl font-bold">{{ cartQuantity }}</span>
+                  <span class="text-xl md:text-2xl font-bold">{{ cartQuantity }}</span>
                   <img
                     v-if="cartQuantity < 15"
                     @click="handleIncrement"
                     src="/Plus_Main.svg"
-                    class="w-10 h-10 cursor-pointer transition active:scale-90"
+                    class="w-8 h-8 md:w-10 md:h-10 cursor-pointer transition active:scale-90"
                   />
                 </div>
                 <img
                   v-else
                   @click="handleIncrement"
                   src="/ButtonOrder_off.svg"
-                  class="cursor-pointer transition active:scale-90 w-40 h-40"
+                  class="cursor-pointer transition active:scale-90 w-24 h-24 md:w-40 md:h-40"
                 />
               </div>
               <img
                 @click="toggleFavorite"
                 :src="isFavorite ? '/ButtonSave_on.svg' : '/ButtonSave_off.svg'"
-                class="cursor-pointer transition active:scale-90 w-40 h-40"
+                class="cursor-pointer transition active:scale-90 w-24 h-24 md:w-40 md:h-40"
               />
             </div>
             <p v-if="cartQuantity >= 15" class="text-red-500 text-sm mt-2">
@@ -64,64 +57,71 @@
 
         <transition name="slide-up" appear>
           <div class="flex flex-col justify-center">
-            <h1 class="text-5xl font-extrabold text-gray-800 mb-6">{{ product.name }}</h1>
-            <p class="text-gray-600 text-lg mb-6" v-if="product.description">
+            <h1 class="text-3xl md:text-5xl font-extrabold text-gray-800 mb-4 md:mb-6">
+              {{ product.name }}
+            </h1>
+            <p class="text-gray-600 text-base md:text-lg mb-4 md:mb-6" v-if="product.description">
               {{ product.description }}
             </p>
 
-            <div class="space-y-4 mb-8">
+            <div class="space-y-3 md:space-y-4 mb-6 md:mb-8">
               <div class="flex gap-4 items-baseline">
-                <span class="font-semibold text-xl w-24">Цена:</span>
-                <span class="text-xl">{{ product.price }} руб.</span>
+                <span class="font-semibold text-lg md:text-xl w-20 md:w-24">Цена:</span>
+                <span class="text-lg md:text-xl">{{ product.price }} руб.</span>
               </div>
               <div class="flex gap-4 items-baseline">
-                <span class="font-semibold text-xl w-24">Вес:</span>
-                <span class="text-xl">{{ product.weight }} гр.</span>
+                <span class="font-semibold text-lg md:text-xl w-20 md:w-24">Вес:</span>
+                <span class="text-lg md:text-xl">{{ product.weight }} гр.</span>
               </div>
               <div class="flex gap-4 items-baseline">
-                <span class="font-semibold text-xl w-24">Цена за кг:</span>
-                <span class="text-xl">{{ pricePerKg }} руб.</span>
+                <span class="font-semibold text-lg md:text-xl w-20 md:w-24">Цена за кг:</span>
+                <span class="text-lg md:text-xl">{{ pricePerKg }} руб.</span>
               </div>
               <div class="flex gap-4 items-baseline" v-if="product.expiration_date">
-                <span class="font-semibold text-xl w-24">Срок годности:</span>
-                <span class="text-xl">{{
+                <span class="font-semibold text-lg md:text-xl w-20 md:w-24">Срок годности:</span>
+                <span class="text-lg md:text-xl">{{
                   new Date(product.expiration_date).toLocaleDateString('ru-RU')
                 }}</span>
               </div>
               <div class="flex flex-col gap-1" v-if="product.cooking_info">
-                <span class="font-semibold text-xl">Приготовление:</span>
-                <span class="text-xl break-words">{{ product.cooking_info }}</span>
+                <span class="font-semibold text-lg md:text-xl">Приготовление:</span>
+                <span class="text-lg md:text-xl break-words">{{ product.cooking_info }}</span>
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-8 mb-8">
+            <!-- Блок оценок: каждая строго на своей строке, адаптивно -->
+            <div class="flex flex-col gap-6 md:gap-8 mb-8">
               <div>
-                <p class="text-base text-gray-500 mb-2">Общая оценка</p>
+                <p class="text-sm md:text-base text-gray-500 mb-2">Общая оценка</p>
                 <div class="flex items-center gap-2">
                   <img
                     v-for="i in 5"
                     :key="'avg' + i"
                     :src="i <= averageRating ? '/Star_on.svg' : '/Star_off.svg'"
-                    class="w-8 h-8"
+                    class="w-8 h-8 md:w-10 md:h-10 flex-shrink-0"
                   />
-                  <span class="ml-2 text-xl font-semibold text-gray-700">{{
-                    averageRating ? averageRating + '/5' : 'нет оценок'
-                  }}</span>
+                  <span
+                    class="ml-2 text-lg md:text-xl font-semibold text-gray-700 whitespace-nowrap"
+                  >
+                    {{ averageRating ? averageRating + '/5' : 'нет оценок' }}
+                  </span>
                 </div>
               </div>
               <div>
-                <p class="text-base text-gray-500 mb-2">Ваша оценка</p>
+                <p class="text-sm md:text-base text-gray-500 mb-2">Ваша оценка</p>
                 <div class="flex items-center gap-2">
                   <img
                     v-for="i in 5"
                     :key="'user' + i"
                     :src="i <= userRating ? '/Star_on.svg' : '/Star_off.svg'"
-                    class="w-8 h-8 cursor-pointer transition hover:scale-110"
+                    class="w-8 h-8 md:w-10 md:h-10 cursor-pointer transition hover:scale-110 flex-shrink-0"
                     @click="rateProduct(i)"
                   />
-                  <span class="ml-2 text-xl font-semibold text-gray-700">{{
-                    userRating ? userRating + '/5' : 'не оценено'
-                  }}</span>
+                  <span
+                    class="ml-2 text-lg md:text-xl font-semibold text-gray-700 whitespace-nowrap"
+                  >
+                    {{ userRating ? userRating + '/5' : 'не оценено' }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -131,16 +131,20 @@
 
       <transition name="slide-up" appear>
         <div v-if="relatedProducts.length" class="mt-12">
-          <h3 class="text-2xl font-semibold mb-6">Похожие товары</h3>
-          <div class="grid grid-cols-2 gap-6">
+          <h3 class="text-xl md:text-2xl font-semibold mb-4 md:mb-6">Похожие товары</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
             <div
               v-for="rel in relatedProducts"
               :key="rel.product_id"
-              class="flex items-center gap-4 border rounded-lg p-4 cursor-pointer hover:shadow transition bg-white"
+              class="flex items-center gap-4 border rounded-lg p-3 md:p-4 cursor-pointer hover:shadow transition bg-white"
               @click="$router.push(`/product/${rel.product_id}`)"
             >
-              <img :src="rel.image_url" :alt="rel.name" class="w-24 h-24 object-contain rounded" />
-              <p class="font-medium text-lg">{{ rel.name }}</p>
+              <img
+                :src="rel.image_url"
+                :alt="rel.name"
+                class="w-16 h-16 md:w-24 md:h-24 object-contain rounded"
+              />
+              <p class="font-medium text-base md:text-lg">{{ rel.name }}</p>
             </div>
           </div>
         </div>
@@ -148,7 +152,6 @@
     </div>
   </div>
 </template>
-
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
