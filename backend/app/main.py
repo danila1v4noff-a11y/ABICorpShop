@@ -1,10 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Импорт моделей
 from app.models import user, product, cart, favorite
 
-# Импорт роутеров
 from app.api.v1.endpoints import hello, auth
 from app.api.v1.endpoints.cart import router as cart_router
 from app.api.v1.endpoints.products import router as products_router
@@ -22,21 +20,26 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# Настройка CORS для работы локально и на Vercel
+origins = [
+    "http://localhost:5173",          # Для локальной разработки фронтенда
+    "https://abi-corp-shop.vercel.app" # Твой живой фронтенд на Vercel
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"], # Разрешаем все методы (GET, POST, PUT, DELETE и т.д.)
+    allow_headers=["*"], # Разрешаем все заголовки (включая Authorization для токенов)
 )
 
-# Подключаем роутеры
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(hello.router, prefix="/api/v1")
 app.include_router(cart_router, prefix="/api/v1")
 app.include_router(products_router, prefix="/api/v1")
 app.include_router(favorites_router, prefix="/api/v1")
-app.include_router(shared_cart_router, prefix="/api/v1")   # <-- добавлено
+app.include_router(shared_cart_router, prefix="/api/v1")
 app.include_router(orders_router, prefix="/api/v1")
 app.include_router(router_admin, prefix="/api/v1")
 app.include_router(categories_router, prefix="/api/v1")
