@@ -20,10 +20,10 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Настройка CORS для работы локально и на Vercel
+
 origins = [
-    "http://localhost:5173",          # Для локальной разработки фронтенда
-    "https://abi-corp-shop.vercel.app" # Твой живой фронтенд на Vercel
+    "http://localhost:5173",         
+    "https://abi-corp-shop.vercel.app" 
 ]
 
 app.add_middleware(
